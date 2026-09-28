@@ -55,7 +55,7 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-def _build_handler():
+def _build_mangum_handler():
     try:
         from mangum import Mangum
 
@@ -64,4 +64,16 @@ def _build_handler():
         return None
 
 
-handler = _build_handler()
+_mangum_handler = _build_mangum_handler()
+
+
+def handler(event, context):
+    """Handler para Lambda (usado por Mangum quando disponível)."""
+    if _mangum_handler is not None:
+        return _mangum_handler(event, context)
+    raise RuntimeError(
+        "Mangum não está disponível. Instale as dependências: pip install -r requirements.txt"
+    )
+
+
+default_handler = handler

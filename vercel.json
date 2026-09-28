@@ -1,13 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pip install -r requirements.txt",
   "functions": {
     "api/index.py": {
-      "runtime": "vercel-python-runtimes@6.2.0"
+      "includeFiles": "app/**,templates/**,static/**"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/((?!api/|static/|_next/|favicon\\.ico).*)", "destination": "/api/index.py" }
+    { "source": "/(.*)", "destination": "/api/index.py" }
   ],
+  "cleanUrls": true,
   "trailingSlash": false
 }
+

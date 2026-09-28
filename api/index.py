@@ -36,6 +36,10 @@ def create_app() -> FastAPI:
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+    templates_dir = BASE_DIR / "templates"
+    app.state.BASE_DIR = BASE_DIR
+    app.state.TEMPLATES_DIR = templates_dir
+
     app.include_router(pages_router.router)
     app.include_router(categories_router.router)
     app.include_router(dashboard_router.router)
@@ -49,3 +53,15 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+def _build_handler():
+    try:
+        from mangum import Mangum
+
+        return Mangum(app, lifespan="off")
+    except Exception:
+        return None
+
+
+handler = _build_handler()

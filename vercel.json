@@ -2,14 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pip install -r requirements.txt",
-  "functions": {
-    "index.py": {
-      "includeFiles": "app/**,templates/**,static/**,api/**,requirements.txt,runtime.txt"
-    },
-    "api/index.py": {
-      "includeFiles": "app/**,templates/**,static/**,requirements.txt,runtime.txt"
-    }
-  },
   "cleanUrls": true,
   "trailingSlash": false
 }

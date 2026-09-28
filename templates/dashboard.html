@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <header class="flex flex-wrap items-end justify-between gap-3 mb-6">
+    <div>
+      <h2 class="text-2xl font-bold text-slate-900">Dashboard</h2>
+      <p class="text-sm text-slate-500 mt-0.5">
+        Acompanhe receitas, despesas e seu saldo no período selecionado.
+      </p>
+    </div>
+    <div class="flex gap-2">
+      <button id="btnMesAtual" class="btn btn-ghost">Mês atual</button>
+      <a href="/novo" class="btn btn-primary">+ Novo Lançamento</a>
+    </div>
+  </header>
+
+  <section class="card p-4 sm:p-5 mb-6 no-print">
+    <h3 class="text-sm font-semibold text-slate-700 mb-3">Período e filtros</h3>
+    <form id="filterForm" class="filters-row">
+      <div>
+        <label class="label" for="f_mes">Mês</label>
+        <select id="f_mes" class="field"></select>
+      </div>
+      <div>
+        <label class="label" for="f_ano">Ano</label>
+        <select id="f_ano" class="field"></select>
+      </div>
+      <div>
+        <label class="label" for="f_start">Data inicial</label>
+        <input id="f_start" type="date" class="field" />
+      </div>
+      <div>
+        <label class="label" for="f_end">Data final</label>
+        <input id="f_end" type="date" class="field" />
+      </div>
+      <div>
+        <label class="label" for="f_type">Tipo</label>
+        <select id="f_type" class="field">
+          <option value="">Todos</option>
+          <option value="RECEITA">Receitas</option>
+          <option value="DESPESA">Despesas</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="f_cat">Categoria</label>
+        <select id="f_cat" class="field"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label class="label" for="f_pag">Forma de pagamento</label>
+        <select id="f_pag" class="field">
+          <option value="">Todas</option>
+          <option>PIX</option>
+          <option>Dinheiro</option>
+          <option>Débito</option>
+          <option>Cartão de crédito</option>
+          <option>Transferência</option>
+          <option>Boleto</option>
+          <option>Outro</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2 md:col-span-1 lg:col-span-2 flex items-end gap-2">
+        <button type="submit" class="btn btn-primary w-full sm:w-auto">Aplicar filtros</button>
+        <button type="reset" id="btnReset" class="btn btn-ghost w-full sm:w-auto">Limpar</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="kpis" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-6">
+    <div class="skeleton h-28"></div>
+    <div class="skeleton h-28"></div>
+    <div class="skeleton h-28"></div>
+    <div class="skeleton h-28"></div>
+    <div class="skeleton h-28"></div>
+    <div class="skeleton h-28"></div>
+  </section>
+
+  <section class="grid gap-6 lg:grid-cols-3 mb-6">
+    <div class="card p-4 sm:p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-slate-700">Receitas x Despesas (por dia)</h3>
+        <span id="periodLabel" class="text-xs text-slate-500"></span>
+      </div>
+      <div class="chart-wrap tall"><canvas id="chartSeries"></canvas></div>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Últimas movimentações</h3>
+      <ol id="ultimasList" class="space-y-2 text-sm"></ol>
+    </div>
+  </section>
+
+  <section class="grid gap-6 lg:grid-cols-3 mb-6">
+    <div class="card p-4 sm:p-5">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Receitas por categoria</h3>
+      <div class="chart-wrap"><canvas id="chartIncCat"></canvas></div>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Despesas por categoria</h3>
+      <div class="chart-wrap"><canvas id="chartExpCat"></canvas></div>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <h3 class="text-sm font-semibold text-slate-700 mb-2">Despesas por forma de pagamento</h3>
+      <div class="chart-wrap"><canvas id="chartPag"></canvas></div>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="max-w-4xl">
+  <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="text-2xl font-bold text-slate-900">Editar Lançamento</h2>
+      <p class="text-sm text-slate-500 mt-0.5">
+        Atualize os dados de um lançamento existente.
+      </p>
+    </div>
+    <a href="/lancamentos" class="btn btn-ghost">← Voltar para lançamentos</a>
+  </header>
+
+  <div id="loading" class="card p-8 text-slate-500">
+    <div class="skeleton h-10 w-64 mb-4"></div>
+    <div class="skeleton h-64"></div>
+  </div>
+
+  <div id="notFound" class="hidden card p-8 text-slate-500">
+    <p>Lançamento não encontrado.</p>
+    <a href="/lancamentos" class="btn btn-ghost mt-4">Voltar</a>
+  </div>
+
+  <div id="editorWrap" class="hidden card p-4 sm:p-6 lg:p-8">
+    <form id="txForm" novalidate>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="label">Tipo</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
+              <input type="radio" name="tipo" value="RECEITA" class="h-4 w-4" />
+              <div>
+                <p class="text-sm font-semibold text-emerald-700">Receita</p>
+                <p class="text-xs text-slate-500">Dinheiro que entrou</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-rose-400 has-[:checked]:bg-rose-50">
+              <input type="radio" name="tipo" value="DESPESA" class="h-4 w-4" />
+              <div>
+                <p class="text-sm font-semibold text-rose-700">Despesa</p>
+                <p class="text-xs text-slate-500">Dinheiro que saiu</p>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="label" for="descricao">Descrição</label>
+          <input id="descricao" name="descricao" type="text" class="field" maxlength="255" />
+        </div>
+        <div>
+          <label class="label" for="categoria">Categoria</label>
+          <select id="categoria" name="category_id" class="field"><option value="">Selecione...</option></select>
+        </div>
+        <div>
+          <label class="label" for="valor">Valor</label>
+          <input id="valor" name="valor" class="field text-lg font-semibold" inputmode="decimal" />
+        </div>
+        <div>
+          <label class="label" for="data">Data da movimentação</label>
+          <input id="data" name="data" type="date" class="field" />
+        </div>
+        <div>
+          <label class="label" for="forma_pagamento">Forma de pagamento</label>
+          <select id="forma_pagamento" name="forma_pagamento" class="field">
+            <option value="">Selecione...</option>
+            <option>PIX</option>
+            <option>Dinheiro</option>
+            <option>Débito</option>
+            <option>Cartão de crédito</option>
+            <option>Transferência</option>
+            <option>Boleto</option>
+            <option>Outro</option>
+          </select>
+        </div>
+        <div id="creditFields" class="hidden sm:col-span-2 grid gap-4 sm:grid-cols-3 border border-brand-100 rounded-2xl bg-brand-50/40 p-4">
+          <div>
+            <label class="label" for="cartao_nome">Nome do cartão</label>
+            <input id="cartao_nome" name="cartao_nome" type="text" class="field" />
+          </div>
+          <div>
+            <label class="label" for="qtd_parcelas">Quantidade de parcelas</label>
+            <input id="qtd_parcelas" name="qtd_parcelas" type="number" min="1" class="field" />
+          </div>
+          <div>
+            <label class="label" for="parcela_atual">Parcela atual</label>
+            <input id="parcela_atual" name="parcela_atual" type="number" min="1" class="field" />
+          </div>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="label" for="observacao">Observação (opcional)</label>
+          <textarea id="observacao" name="observacao" rows="3" class="field"></textarea>
+        </div>
+        <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div id="formStatus" class="text-sm"></div>
+          <div class="flex gap-2">
+            <a href="/lancamentos" class="btn btn-ghost">Cancelar</a>
+            <button id="btnSave" type="submit" class="btn btn-primary">Salvar Alterações</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/transaction-form.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const id = new URLSearchParams(window.location.search).get('id');
+  if (!id) {
+    document.getElementById('notFound').classList.remove('hidden');
+    document.getElementById('loading').classList.add('hidden');
+    return;
+  }
+  try {
+    const tx = await MCF.api('/api/transactions/' + encodeURIComponent(id));
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('editorWrap').classList.remove('hidden');
+    MCF.initTransactionForm('/api/transactions/' + encodeURIComponent(id), 'PUT', tx, '/lancamentos');
+  } catch (e) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('notFound').classList.remove('hidden');
+    MCF.toast('Lançamento não encontrado.', 'error');
+  }
+});
+</script>
+{% endblock %}

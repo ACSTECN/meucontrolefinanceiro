@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="max-w-4xl">
+  <header class="mb-6">
+    <h2 class="text-2xl font-bold text-slate-900">Novo Lançamento</h2>
+    <p class="text-sm text-slate-500 mt-0.5">
+      Registre uma receita ou despesa e mantenha seu controle em dia.
+    </p>
+  </header>
+
+  <div class="card p-4 sm:p-6 lg:p-8">
+    <form id="txForm" method="dialog" novalidate>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="label">Tipo</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
+              <input type="radio" name="tipo" value="RECEITA" required class="h-4 w-4" />
+              <div>
+                <p class="text-sm font-semibold text-emerald-700">Receita</p>
+                <p class="text-xs text-slate-500">Dinheiro que entrou</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-rose-400 has-[:checked]:bg-rose-50">
+              <input type="radio" name="tipo" value="DESPESA" class="h-4 w-4" />
+              <div>
+                <p class="text-sm font-semibold text-rose-700">Despesa</p>
+                <p class="text-xs text-slate-500">Dinheiro que saiu</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="label" for="descricao">Descrição</label>
+          <input id="descricao" name="descricao" type="text" required class="field" maxlength="255" placeholder="Ex: Supermercado, Salário, Uber..." />
+        </div>
+
+        <div>
+          <label class="label" for="categoria">Categoria</label>
+          <select id="categoria" name="category_id" required class="field"><option value="">Selecione...</option></select>
+        </div>
+
+        <div>
+          <label class="label" for="valor">Valor</label>
+          <input id="valor" name="valor" required class="field text-lg font-semibold" inputmode="decimal" placeholder="R$ 0,00" />
+        </div>
+
+        <div>
+          <label class="label" for="data">Data da movimentação</label>
+          <input id="data" name="data" type="date" required class="field" />
+        </div>
+
+        <div>
+          <label class="label" for="forma_pagamento">Forma de pagamento</label>
+          <select id="forma_pagamento" name="forma_pagamento" required class="field">
+            <option value="">Selecione...</option>
+            <option>PIX</option>
+            <option>Dinheiro</option>
+            <option>Débito</option>
+            <option>Cartão de crédito</option>
+            <option>Transferência</option>
+            <option>Boleto</option>
+            <option>Outro</option>
+          </select>
+        </div>
+
+        <div id="creditFields" class="hidden sm:col-span-2 grid gap-4 sm:grid-cols-3 border border-brand-100 rounded-2xl bg-brand-50/40 p-4">
+          <div>
+            <label class="label" for="cartao_nome">Nome do cartão</label>
+            <input id="cartao_nome" name="cartao_nome" type="text" class="field" placeholder="Ex: Nubank, Inter..." />
+          </div>
+          <div>
+            <label class="label" for="qtd_parcelas">Quantidade de parcelas</label>
+            <input id="qtd_parcelas" name="qtd_parcelas" type="number" min="1" class="field" placeholder="1" />
+          </div>
+          <div>
+            <label class="label" for="parcela_atual">Parcela atual</label>
+            <input id="parcela_atual" name="parcela_atual" type="number" min="1" class="field" placeholder="1" />
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="label" for="observacao">Observação (opcional)</label>
+          <textarea id="observacao" name="observacao" rows="3" class="field" placeholder="Detalhes adicionais..."></textarea>
+        </div>
+
+        <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div id="formStatus" class="text-sm"></div>
+          <div class="flex gap-2">
+            <a href="/lancamentos" class="btn btn-ghost">Cancelar</a>
+            <button id="btnSave" type="submit" class="btn btn-primary">
+              Salvar Lançamento
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/transaction-form.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => MCF.initTransactionForm('/api/transactions', 'POST', null, '/lancamentos'));</script>
+{% endblock %}

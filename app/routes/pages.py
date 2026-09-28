@@ -24,7 +24,9 @@ def _render(request: Request, template_name: str, **extra):
         else "",
     }
     ctx.update(extra)
-    return templates.TemplateResponse(request, template_name, ctx)
+    template = templates.get_template(template_name)
+    html = template.render(ctx, request=request)
+    return HTMLResponse(content=html, media_type="text/html; charset=utf-8")
 
 
 @router.get("/", response_class=HTMLResponse)

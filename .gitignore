@@ -44,7 +44,6 @@ venv/
 env/
 ENV/
 .venv/
-.python-version
 .env
 .vercel
 node_modules/

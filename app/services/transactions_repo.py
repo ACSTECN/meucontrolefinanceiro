@@ -337,10 +337,17 @@ class SupabaseTransactionRepository:
     def __init__(self, client) -> None:
         self._client = client
 
+    def _tbl(self, name: str):
+        """Wrapper unificado: usa .from_() em supabase v2+, .table() em v1.
+        Evita AttributeError: 'SyncQueryRequestBuilder' object has no attribute 'select'"""
+        if hasattr(self._client, "from_") and callable(self._client.from_):
+            return self._client.from_(name)
+        return self._client.table(name)
+
     # ---- Categories ----
     def list_categories(self) -> List[Dict[str, Any]]:
         r = (
-            self._client.table("categories")
+            self._tbl("categories")
             .select("*")
             .order("tipo", desc=False)
             .order("nome", desc=False)
@@ -350,7 +357,7 @@ class SupabaseTransactionRepository:
 
     def get_category(self, cat_id: UUID) -> Optional[Dict[str, Any]]:
         r = (
-            self._client.table("categories")
+            self._tbl("categories")
             .select("*")
             .eq("id", str(cat_id))
             .maybe_single()
@@ -369,7 +376,7 @@ class SupabaseTransactionRepository:
         payment_method: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         q = (
-            self._client.table("transactions")
+            self._tbl("transactions")
             .select("*, category:categories(nome)")
             .order("data", desc=True)
             .order("created_at", desc=True)
@@ -395,7 +402,7 @@ class SupabaseTransactionRepository:
 
     def get_transaction(self, tx_id: UUID) -> Optional[Dict[str, Any]]:
         r = (
-            self._client.table("transactions")
+            self._tbl("transactions")
             .select("*, category:categories(nome)")
             .eq("id", str(tx_id))
             .maybe_single()
@@ -422,7 +429,7 @@ class SupabaseTransactionRepository:
             else:
                 insertable[k] = v
         r = (
-            self._client.table("transactions")
+            self._tbl("transactions")
             .insert(insertable)
             .select("*, category:categories(nome)")
             .single()
@@ -448,7 +455,7 @@ class SupabaseTransactionRepository:
             else:
                 updatable[k] = v
         r = (
-            self._client.table("transactions")
+            self._tbl("transactions")
             .update(updatable)
             .eq("id", str(tx_id))
             .select("*, category:categories(nome)")
@@ -465,7 +472,7 @@ class SupabaseTransactionRepository:
 
     def delete_transaction(self, tx_id: UUID) -> None:
         r = (
-            self._client.table("transactions")
+            self._tbl("transactions")
             .delete()
             .eq("id", str(tx_id))
             .execute()

@@ -103,10 +103,6 @@ def create_transaction(payload: dict, repo: RepoDep):
         parcela_atual = 1
         insertable["parcela_atual"] = parcela_atual
     try:
-        if "valor" in insertable:
-            from decimal import Decimal
-            if isinstance(insertable["valor"], Decimal):
-                insertable["valor"] = float(insertable["valor"])
         created = repo.create_transaction(insertable)
 
         # --- Parcelamento: cria parcelas futuras 2..N automaticamente ---
@@ -128,10 +124,6 @@ def create_transaction(payload: dict, repo: RepoDep):
                             "errors": errors,
                         },
                     ) from None
-                if "valor" in fut:
-                    from decimal import Decimal
-                    if isinstance(fut["valor"], Decimal):
-                        fut["valor"] = float(fut["valor"])
                 # Insere parcela futura (erro aqui é propagado, não deixa transação parcial)
                 repo.create_transaction(fut)
 

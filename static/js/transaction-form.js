@@ -136,7 +136,7 @@
     var parcAtual = Number((document.getElementById('parcela_atual') || {}).value || 1) || 1;
     if (parcAtual < 1) parcAtual = 1;
     var valorStr = (document.getElementById('valor') || {}).value || '';
-    var valor = Number(MCF.moneyToDecimal(document.getElementById('valor')));
+    var valor = MCF._parseMoneyValue(MCF.moneyToDecimal(document.getElementById('valor')));
     var data = isoToDate((document.getElementById('data') || {}).value);
 
     if (pg !== 'Cartão de crédito' && pg !== 'Empréstimo' && !(qtd > 1)) {
@@ -213,9 +213,10 @@
     if (!payload.category_id) errs.push('Selecione uma categoria.');
     if (!payload.forma_pagamento) errs.push('Selecione a forma de pagamento.');
     if (!payload.data) errs.push('Informe a data da movimentação.');
-    var valor = Number(MCF.moneyToDecimal(document.getElementById('valor')));
+    var valor = MCF._parseMoneyValue(MCF.moneyToDecimal(document.getElementById('valor')));
     if (!(valor > 0)) errs.push('Informe um valor maior que zero.');
-    if (payload.forma_pagamento === 'Cartão de crédito') {
+    var HAB_PARC = ['Cartão de crédito', 'Empréstimo'];
+    if (HAB_PARC.indexOf(payload.forma_pagamento) !== -1) {
       var q = Number(payload.qtd_parcelas || 1) || 0;
       var pa = Number(payload.parcela_atual || 1) || 0;
       if (q < 1) errs.push('Quantidade de parcelas deve ser pelo menos 1.');
@@ -406,7 +407,7 @@
     if (!tx) return;
     setTipo(tx.tipo, { keepCategories: false });
     document.getElementById('descricao').value = tx.descricao || '';
-    if (tx.valor) setQuickValue(Number(tx.valor).toFixed(2));
+    if (tx.valor) setQuickValue(Number(MCF._parseMoneyValue(tx.valor)).toFixed(2));
     document.getElementById('data').value = tx.data || MCF.todayISO();
     if (tx.category_id) selectCategoria(tx.category_id, CATEGORIES_BY_ID[tx.category_id]);
     selectForma(tx.forma_pagamento || '');

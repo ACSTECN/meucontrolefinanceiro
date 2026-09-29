@@ -7,17 +7,38 @@
   'use strict';
 
   // ----------- formatação -----------
+  function _parseMoneyValue(raw) {
+    // Helper compartilhado por formatBRL / qualquer calculadora de valor.
+    // Regras: Number → Number.isFinite() direto.
+    // String:
+    //   - Se TEM vírgula → pt-BR (remove pontos de milhar, vírgula vira ponto)
+    //   - Se NÃO TEM vírgula MAS TEM pelo menos 1 ponto → US (parseFloat direto; ponto é decimal)
+    //   - Se NEM vírgula NEM ponto → dígitos puros? Faz parseFloat direto (se veio do backend
+    //     é integer string mesmo, não divide por 100; se veio de input puro é int, confia).
+    if (raw === null || raw === undefined || raw === '') return 0;
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
+    if (typeof raw === 'boolean') return raw ? 1 : 0;
+    var s = String(raw).trim();
+    if (!s) return 0;
+    // tira simbolo R$ e espacos se tiver
+    s = s.replace(/R\$/g, '').replace(/\s+/g, '').replace(/[.,]$/, '');
+    if (!s) return 0;
+    var hasVirgula = s.indexOf(',') !== -1;
+    var hasPonto = s.indexOf('.') !== -1;
+    var cleaned = s;
+    if (hasVirgula) {
+      // pt-BR: remove todos pontos (milhar), vira a virgula em decimal
+      cleaned = s.replace(/\./g, '').replace(',', '.');
+    } else if (hasPonto) {
+      // formato US de API: mantem.
+      cleaned = s;
+    }
+    var v = parseFloat(cleaned);
+    return Number.isFinite(v) ? v : 0;
+  }
+
   function formatBRL(raw) {
-    if (raw === null || raw === undefined || raw === '') return 'R$ 0,00';
-    const n = (function parse() {
-      if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
-      if (typeof raw === 'string') {
-        const s = raw.replace(/\./g, '').replace(',', '.');
-        const v = parseFloat(s);
-        return Number.isFinite(v) ? v : 0;
-      }
-      return 0;
-    })();
+    var n = _parseMoneyValue(raw);
     return n.toLocaleString('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -228,11 +249,50 @@
   }
 
   function moneyToDecimal(input) {
-    const raw = input && input.hasAttribute('data-value')
-      ? input.getAttribute('data-value')
-      : (input ? input.value : '0');
-    const n = Number(String(raw).replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+    // Regras de parse (SEM AMBIGUIDADE):
+    //  1) Se input tem attr `data-value` (escrito por maskMoney) → SEMPRE formato USA "NNNN.DD"
+    //     (1 único ponto decimal, NÃO tem separador de milhar). NÃO remove NADA, só parseFloat.
+    //  2) Se não tem data-value → valor é texto digitado pelo usuário em pt-BR. Remove R$, espaços,
+    //     pontos (separador de milhar), troca a vírgula por ponto decimal.
+    //  3) Defesa extra: se tem vírgula E tem mais de 1 ponto → com certeza pt-BR.
+    var raw = '';
+    var sourceIsUS = false;
+    if (input && input.hasAttribute && input.hasAttribute('data-value')) {
+      raw = (input.getAttribute('data-value') || '').trim();
+      sourceIsUS = !!raw;
+    }
+    if (!raw && input) {
+      raw = (typeof input === 'string') ? input : (input.value || '');
+      raw = String(raw).trim();
+      // tira simbolo R$, espaços, ponto final no final (tipo "17.500,")
+      raw = raw.replace(/R\$/g, '').replace(/\s+/g, '').replace(/[.,]$/, '');
+    }
+    if (!raw) return '0.00';
+    var n = NaN;
+    if (sourceIsUS) {
+      n = Number(raw);
+    } else {
+      // Detecta o que é decimal: se TEM vírgula, a vírgula é o decimal; senão, último ponto (se houver) é decimal.
+      var hasVirgula = raw.indexOf(',') !== -1;
+      if (hasVirgula) {
+        // pt-BR: 1) remove TODOS os pontos (milhar), 2) troca vírgula por ponto (decimal)
+        var cleaned = raw.replace(/\./g, '').replace(',', '.');
+        n = Number(cleaned);
+      } else {
+        // Sem vírgula: se tem ponto, assume que é decimal (US style); senão divide por 100 (centavos)
+        if (raw.indexOf('.') !== -1) {
+          n = Number(raw);
+        } else if (/^\d+$/.test(raw)) {
+          n = parseInt(raw, 10) / 100;
+        } else {
+          n = Number(raw);
+        }
+      }
+    }
+    if (!Number.isFinite(n)) return '0.00';
+    // Nunca deixa passar mais de 2 casas decimais e NaN
+    var fixed = Number(n).toFixed(2);
+    return fixed;
   }
 
   // ----------- env note -----------
@@ -343,6 +403,7 @@
   // Expõe globals
   window.MCF = {
     formatBRL,
+    _parseMoneyValue,
     formatDateBR,
     todayISO,
     monthStartISO,

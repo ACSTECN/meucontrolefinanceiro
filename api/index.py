@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse as _BaseJSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -32,6 +35,40 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class DecimalSafeJSONResponse(_BaseJSONResponse):
+    """Response JSON que NUNCA transforma Decimal em float.
+    Evita bugs de 0.1 + 0.2 = 0.30000000000000004 em valores financeiros.
+    Todo Decimal é serializado como STRING com EXATAMENTE 2 casas decimais (ex: "17500.00").
+    O frontend parseia essa string corretamente via MCF._parseMoneyValue / Number().
+    """
+    media_type = "application/json"
+
+    @staticmethod
+    def _default(o):
+        import datetime as _dt
+        from uuid import UUID
+        if isinstance(o, Decimal):
+            q = Decimal("0.01")
+            return format(o.quantize(q, rounding=ROUND_HALF_UP), "f")
+        if isinstance(o, UUID):
+            return str(o)
+        if isinstance(o, (_dt.datetime, _dt.date)):
+            return o.isoformat()
+        if isinstance(o, set):
+            return list(o)
+        raise TypeError(f"Tipo {type(o).__name__} não é serializável para JSON.")
+
+    def render(self, content) -> bytes:
+        # ensure_ascii=False → emojis / acentos corretos
+        return json.dumps(
+            content,
+            default=DecimalSafeJSONResponse._default,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Meu Controle Financeiro",
@@ -40,6 +77,7 @@ def create_app() -> FastAPI:
             "e persistência no Supabase."
         ),
         version="1.0.0",
+        default_response_class=DecimalSafeJSONResponse,
     )
 
     app.add_middleware(

@@ -368,11 +368,16 @@ class SupabaseTransactionRepository:
     @staticmethod
     def _jsonable(v: Any) -> Any:
         import datetime as _dt
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         if isinstance(v, UUID):
             return str(v)
         if isinstance(v, Decimal):
-            return float(v)
+            # NUNCA use float() para Decimal financeiro — pode causar 0.1+0.2=0.30000000000000004.
+            # O PostgREST aceita strings para campos NUMERIC e faz o cast corretamente.
+            # Também garante exatamente 2 casas decimais (arredondamento bancário HALF_UP).
+            twoplaces = Decimal("0.01")
+            quantized = v.quantize(twoplaces, rounding=ROUND_HALF_UP)
+            return format(quantized, "f")  # string "17500.00" sem notação científica
         if isinstance(v, _dt.datetime):
             return v.isoformat()
         if isinstance(v, _dt.date):

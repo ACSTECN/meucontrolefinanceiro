@@ -125,16 +125,20 @@
   }
 
   function renderKPIs(data) {
-    var wrap = document.getElementById('kpis');
-    if (!wrap) return;
-    var balanceClass = (data.balance >= 0) ? 'kpi-balance-pos' : 'kpi-balance-neg';
-    wrap.innerHTML =
-      kpiCard('kpi-income', ICONS.income, 'Receitas', MCF.formatBRL(data.income), 'Dinheiro que entrou no período') +
-      kpiCard('kpi-expense', ICONS.outcome, 'Despesas', MCF.formatBRL(data.expenses), 'Dinheiro que saiu no período') +
-      kpiCard(balanceClass, ICONS.balance, 'Saldo', MCF.formatBRL(data.balance), (data.balance >= 0 ? 'Saldo positivo 🎉' : 'Saldo negativo — atenção')) +
-      kpiCard('kpi-count', ICONS.count, 'Qtde lançamentos', String(data.transaction_count || 0), 'Registros no período selecionado') +
-      kpiCard('kpi-maxinc', ICONS.maxinc, 'Maior receita', MCF.formatBRL(data.maior_receita || 0), (data.maior_receita_descricao && Number(data.maior_receita || 0) > 0) ? data.maior_receita_descricao : 'Sem receitas ainda') +
-      kpiCard('kpi-maxexp', ICONS.maxexp, 'Maior despesa', MCF.formatBRL(data.maior_despesa || 0), (data.maior_despesa_descricao && Number(data.maior_despesa || 0) > 0) ? data.maior_despesa_descricao : 'Sem despesas ainda');
+    var incomeV = MCF._parseMoneyValue(data.income);
+    var expV = MCF._parseMoneyValue(data.expenses);
+    var balV = MCF._parseMoneyValue(data.balance);
+    var maiV = MCF._parseMoneyValue(data.maior_receita);
+    var madV = MCF._parseMoneyValue(data.maior_despesa);
+    var cnt  = Number(data.transaction_count) || 0;
+    var balanceClass = (balV >= 0) ? 'kpi-balance-pos' : 'kpi-balance-neg';
+    document.getElementById('kpis').innerHTML =
+      kpiCard('kpi-income', ICONS.income, 'Receitas', MCF.formatBRL(incomeV), 'Dinheiro que entrou no período') +
+      kpiCard('kpi-expense', ICONS.outcome, 'Despesas', MCF.formatBRL(expV), 'Dinheiro que saiu no período') +
+      kpiCard(balanceClass, ICONS.balance, 'Saldo', MCF.formatBRL(balV), (balV >= 0 ? 'Saldo positivo 🎉' : 'Saldo negativo — atenção')) +
+      kpiCard('kpi-count', ICONS.count, 'Lançamentos', cnt.toLocaleString('pt-BR'), 'Total de registros no período') +
+      kpiCard('kpi-maxinc', ICONS.maxinc, 'Maior receita', MCF.formatBRL(maiV || 0), (data.maior_receita_descricao && maiV > 0) ? data.maior_receita_descricao : 'Sem receitas ainda') +
+      kpiCard('kpi-maxexp', ICONS.maxexp, 'Maior despesa', MCF.formatBRL(madV || 0), (data.maior_despesa_descricao && madV > 0) ? data.maior_despesa_descricao : 'Sem despesas ainda');
   }
 
   function ensureColors(n) {
@@ -183,8 +187,8 @@
 
   function renderCharts(data) {
     var labels = (data.series || []).map(function (p) { return MCF.formatDateBR(p.label); });
-    var incomes = (data.series || []).map(function (p) { return Number(p.income); });
-    var expenses = (data.series || []).map(function (p) { return Number(p.expenses); });
+    var incomes = (data.series || []).map(function (p) { return MCF._parseMoneyValue(p.income); });
+    var expenses = (data.series || []).map(function (p) { return MCF._parseMoneyValue(p.expenses); });
 
     function destroy(ref) { if (charts[ref]) { try { charts[ref].destroy(); } catch (e) {} charts[ref] = null; } }
 
@@ -230,7 +234,7 @@
       var ctx = document.getElementById(ctxId);
       if (!ctx) return null;
       var labels2 = arr.map(function (a) { return a.name; });
-      var values = arr.map(function (a) { return Number(a.total); });
+      var values = arr.map(function (a) { return MCF._parseMoneyValue(a.total); });
       var empty = !values.length;
       if (empty) {
         labels2 = [emptyLabel || 'Sem dados'];

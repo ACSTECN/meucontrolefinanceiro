@@ -106,11 +106,11 @@
 
   function computeSummary(list) {
     var inc = 0, exp = 0;
-    list.forEach(function (t) {
-      var v = Number(t.valor);
+    (list || []).forEach(function (t) {
+      var v = MCF._parseMoneyValue(t.valor);
       if (t.tipo === 'RECEITA') inc += v; else exp += v;
     });
-    return { income: inc, expenses: exp, balance: inc - exp, count: list.length };
+    return { income: inc, expenses: exp, balance: inc - exp, count: (list || []).length };
   }
 
   function renderSummary(list) {

@@ -25,12 +25,18 @@ class PaymentMethod(str, enum.Enum):
     DINHEIRO = "Dinheiro"
     DEBITO = "Débito"
     CREDITO = "Cartão de crédito"
+    EMPRESTIMO = "Empréstimo"
     TRANSFERENCIA = "Transferência"
     BOLETO = "Boleto"
     OUTRO = "Outro"
 
 
-PAYMENT_METHODS_CREDITO = {PaymentMethod.CREDITO, PaymentMethod.CREDITO.value}
+PAYMENT_METHODS_CREDITO = {
+    PaymentMethod.CREDITO,
+    PaymentMethod.CREDITO.value,
+    PaymentMethod.EMPRESTIMO,
+    PaymentMethod.EMPRESTIMO.value,
+}
 
 
 class CategorySchema(BaseModel):
@@ -118,8 +124,8 @@ class TransactionCreate(BaseModel):
 
     @model_validator(mode="after")
     def _cartao_check(self) -> "TransactionCreate":
-        eh_credito = self.forma_pagamento == PaymentMethod.CREDITO.value
-        if eh_credito:
+        eh_parcelavel = self.forma_pagamento in PAYMENT_METHODS_CREDITO
+        if eh_parcelavel:
             if self.qtd_parcelas is None:
                 self.qtd_parcelas = 1
             if self.parcela_atual is None:

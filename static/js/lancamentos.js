@@ -64,10 +64,14 @@
   }
 
   function getFormFilters() {
-    var month = document.getElementById('f_mes').value;
-    var year  = document.getElementById('f_ano').value;
-    var start = document.getElementById('f_start').value;
-    var end   = document.getElementById('f_end').value;
+    function val(id, def) {
+      var el = document.getElementById(id);
+      return el ? (el.value || '') : (def || '');
+    }
+    var month = val('f_mes');
+    var year  = val('f_ano');
+    var start = val('f_start');
+    var end   = val('f_end');
     if (!start && !end && month && year) {
       var m = parseInt(month, 10) - 1, y = parseInt(year, 10);
       var last = new Date(y, m + 1, 0);
@@ -83,9 +87,9 @@
     }
     return {
       month: month, year: year, start_date: start, end_date: end,
-      type: document.getElementById('f_type').value,
-      category: document.getElementById('f_cat').value,
-      payment_method: document.getElementById('f_pag').value,
+      type: val('f_type'),
+      category: val('f_cat'),
+      payment_method: val('f_pag'),
     };
   }
 
@@ -142,20 +146,27 @@
   }
 
   function applyLocalFilters(list) {
-    var q = (localSearch || '').toLowerCase().trim();
-    return list.filter(function (t) {
-      if (quickType && t.tipo !== quickType) return false;
-      if (quickPag && t.forma_pagamento !== quickPag) return false;
-      if (!q) return true;
-      var hay = [t.descricao || '', t.categoria_nome || '', t.observacao || '', t.forma_pagamento || ''].join(' ').toLowerCase();
-      return hay.indexOf(q) !== -1;
-    });
+    try {
+      var q = (localSearch || '').toLowerCase().trim();
+      return (list || []).filter(function (t) {
+        try {
+          if (quickType && t.tipo !== quickType) return false;
+          if (quickPag && t.forma_pagamento !== quickPag) return false;
+          if (!q) return true;
+          var catNome = t.categoria_nome || (t.category && t.category.nome) || '';
+          var hay = [t.descricao || '', catNome, t.observacao || '', t.forma_pagamento || ''].join(' ').toLowerCase();
+          return hay.indexOf(q) !== -1;
+        } catch (e) { return true; }
+      });
+    } catch (e) { return (list || []); }
   }
 
   function badgeTipo(t) {
-    return t.tipo === 'RECEITA'
-      ? '<span class="badge badge-income">Receita</span>'
-      : '<span class="badge badge-expense">Despesa</span>';
+    try {
+      return t.tipo === 'RECEITA'
+        ? '<span class="badge badge-income">Receita</span>'
+        : '<span class="badge badge-expense">Despesa</span>';
+    } catch (e) { return '<span class="badge badge-default">—</span>'; }
   }
   function badgePgto(pg) {
     if (!pg) return '<span class="badge badge-default">—</span>';
@@ -166,8 +177,10 @@
     else if (pg === 'Dinheiro') cls = 'badge-pg-dinheiro';
     else if (pg === 'Transferência') cls = 'badge-pg-transf';
     else if (pg === 'Boleto') cls = 'badge-pg-boleto';
+    else if (pg === 'Empréstimo') cls = 'badge-pg-emprestimo';
     else if (pg === 'Outro') cls = 'badge-pg-outro';
-    return '<span class="badge ' + cls + '">' + pg + '</span>';
+    var extraStyle = (pg === 'Empréstimo') ? ' style="background:linear-gradient(160deg, rgba(124,58,237,0.25), rgba(30,27,75,0.85));border-color:rgba(167,139,250,0.5);color:#e9d5ff;"' : '';
+    return '<span class="badge ' + cls + '"' + extraStyle + '>' + pg + '</span>';
   }
 
   function formatValor(t) {
@@ -277,10 +290,14 @@
   }
 
   function localRerender() {
-    var filtered = applyLocalFilters(loaded || []);
-    renderSummary(filtered);
-    renderRows(filtered);
-    bindDelete();
+    try {
+      var filtered = applyLocalFilters(loaded || []);
+      try { renderSummary(filtered); } catch (e) { try { MCF.toast('Erro no resumo.', 'warn'); } catch (_) {} }
+      try { renderRows(filtered); } catch (e) { try { MCF.toast('Erro ao desenhar tabela.', 'warn'); } catch (_) {} }
+      try { bindDelete(); } catch (e) {}
+    } catch (outer) {
+      try { MCF.toast('Erro interno ao renderizar.', 'error'); } catch (_) {}
+    }
   }
 
   // Timer DEFENSIVO: nunca deixa "Carregando..." infinito.
@@ -290,24 +307,44 @@
   var loadTimerId = null;
   var loadResolved = false;
   function _forceLoadFinish(silentTimeout) {
-    if (loadResolved) return;
-    loadResolved = true;
-    if (loadTimerId) { clearTimeout(loadTimerId); loadTimerId = null; }
-    if (silentTimeout && (!loaded || loaded.length === 0)) {
-      MCF.toast('Tempo excedido: mostrando lista local. Recarregue a página para tentar novamente.', 'warn');
+    try {
+      if (loadResolved) return;
+      loadResolved = true;
+      if (loadTimerId) { clearTimeout(loadTimerId); loadTimerId = null; }
+      if (silentTimeout && (!loaded || loaded.length === 0)) {
+        try { MCF.toast('Tempo excedido: mostrando lista local. Recarregue a página para tentar novamente.', 'warn'); } catch (e) {}
+      }
+      // Garante que loaded NUNCA é null quando sair daqui (evita render do skeleton)
+      if (!loaded) loaded = [];
+      try { localRerender(); } catch (e) {
+        try { MCF.toast('Erro ao renderizar lançamentos.', 'error'); } catch (_) {}
+      }
+    } catch (outer) {
+      // Ultima camada: remover skeleton manualmente via DOM direto
+      try {
+        var tableWrap = document.querySelector('section.card-soft');
+        var sk = document.querySelectorAll('.skeleton');
+        (sk || []).forEach(function (el) { el.style.display = 'none'; });
+        if (tableWrap) tableWrap.innerHTML = '<div class="p-10 text-center text-royal-200/70"><b style="font-size:22px; display:block; margin-bottom:10px;">Nenhum lançamento encontrado</b><p class="text-sm">Tente ajustar os filtros acima ou clique em Novo Lançamento.</p></div>';
+      } catch (__) {}
     }
-    try { localRerender(); } catch (e) { /* ignore render errors */ }
   }
 
   async function load() {
+    // ==========================================================
+    // PRIMEIRA COISA: agenda o timer DEFENSIVO hard 6 segundos.
+    // NÃO PODE THROW ANTES DISSO. Nunca mais skeleton infinito.
+    // ==========================================================
     loadResolved = false;
     if (loadTimerId) { clearTimeout(loadTimerId); loadTimerId = null; }
-    loaded = null; // volta para "carregando" visualmente
+    loadTimerId = setTimeout(function () { _forceLoadFinish(true); }, MAX_LOAD_MS);
+
+    // Agora sim: resto do código (qualquer throw aqui não mata o timer)
+    loaded = null;
     var f = getFormFilters();
     MCF.setQuery(f);
     var pEl = document.getElementById('periodLabel');
-    if (pEl) pEl.textContent = periodText(f.start_date, f.end_date);
-    loadTimerId = setTimeout(function () { _forceLoadFinish(true); }, MAX_LOAD_MS);
+    if (pEl) { try { pEl.textContent = periodText(f.start_date, f.end_date); } catch (e) {} }
     try {
       var url = MCF.buildTransactionsQuery(f);
       var resultado = await MCF.withTimeout(
@@ -323,8 +360,6 @@
       if (b && q) { b.value = q; localSearch = q; }
       else if (b) { localSearch = b.value; }
     } catch (e) {
-      // Em caso de erro, seta loaded = [] e renderiza mesmo assim, para não
-      // ficar com skeleton "Carregando..." infinito na tela.
       loaded = [];
       if (!loadResolved) MCF.toast(e.message || 'Erro ao carregar lançamentos.', 'error');
     } finally {
@@ -393,60 +428,117 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    var f = MCF.currentFilters();
-    if (!f.month) f.month = MCF.qs('mes', '');
-    if (!f.year)  f.year  = MCF.qs('ano', '');
-    fillMonthYear(f);
-    applyFiltersToForm(f);
-    var st = document.getElementById('f_start'), en = document.getElementById('f_end');
-    if (st && !st.value && f.start_date) st.value = f.start_date;
-    if (en && !en.value && f.end_date)   en.value = f.end_date;
-    // compat: mes/ano e datas sincronizas
-    var mesQ = MCF.qs('mes', ''), anoQ = MCF.qs('ano', '');
-    if (mesQ && anoQ && !st.value && !en.value) {
-      var m = parseInt(mesQ, 10) - 1, y = parseInt(anoQ, 10);
-      var lastD = new Date(y, m + 1, 0).getDate();
-      st.value = (y + '-' + String(m + 1).padStart(2, '0') + '-01');
-      en.value = (y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastD).padStart(2, '0'));
-    }
-    var pEl = document.getElementById('periodLabel');
-    if (pEl) pEl.textContent = periodText(st ? st.value : '', en ? en.value : '');
-
-    await loadCategories();
-    setupQuickChips();
-
-    document.getElementById('filterForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      quickType = document.getElementById('f_type').value || '';
-      quickPag  = document.getElementById('f_pag').value  || '';
-      // sincroniza chips
-      var ct = document.getElementById('chipsTipo'); if (ct) {
-        ct.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-type') || '') === quickType); });
+    try {
+      var f = MCF.currentFilters();
+      if (!f.month) f.month = MCF.qs('mes', '');
+      if (!f.year)  f.year  = MCF.qs('ano', '');
+      fillMonthYear(f);
+      try { applyFiltersToForm(f); } catch (e) {}
+      var st = document.getElementById('f_start'), en = document.getElementById('f_end');
+      if (st && !st.value && f.start_date) st.value = f.start_date;
+      if (en && !en.value && f.end_date)   en.value = f.end_date;
+      // compat: mes/ano e datas sincronizas
+      var mesQ = MCF.qs('mes', ''), anoQ = MCF.qs('ano', '');
+      if (mesQ && anoQ && !st.value && !en.value) {
+        var m = parseInt(mesQ, 10) - 1, y = parseInt(anoQ, 10);
+        var lastD = new Date(y, m + 1, 0).getDate();
+        st.value = (y + '-' + String(m + 1).padStart(2, '0') + '-01');
+        en.value = (y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastD).padStart(2, '0'));
       }
-      var cp = document.getElementById('chipsPag'); if (cp) {
-        cp.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-pg') || '') === quickPag); });
+      var pEl = document.getElementById('periodLabel');
+      try { if (pEl) pEl.textContent = periodText(st ? st.value : '', en ? en.value : ''); } catch (e) {}
+
+      try { await loadCategories(); } catch (e) {}
+      try { setupQuickChips(); } catch (e) {}
+
+      var filterForm = document.getElementById('filterForm');
+      if (filterForm) {
+        filterForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          try {
+            quickType = document.getElementById('f_type').value || '';
+            quickPag  = document.getElementById('f_pag').value  || '';
+            // sincroniza chips
+            var ct = document.getElementById('chipsTipo'); if (ct) {
+              ct.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-type') || '') === quickType); });
+            }
+            var cp = document.getElementById('chipsPag'); if (cp) {
+              cp.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-pg') || '') === quickPag); });
+            }
+          } catch (inner) {}
+          load();
+        });
       }
-      load();
-    });
-    document.getElementById('btnReset').addEventListener('click', function () {
-      MCF.setQuery({ month: '', year: '', mes: '', ano: '', start_date: '', end_date: '', type: '', category: '', payment_method: '', search: '', q: '' });
-      setTimeout(function () { location.reload(); }, 0);
-    });
+      var btnReset = document.getElementById('btnReset');
+      if (btnReset) {
+        btnReset.addEventListener('click', function () {
+          MCF.setQuery({ month: '', year: '', mes: '', ano: '', start_date: '', end_date: '', type: '', category: '', payment_method: '', search: '', q: '' });
+          setTimeout(function () { location.reload(); }, 0);
+        });
+      }
 
-    var fm = document.getElementById('f_mes'), fa = document.getElementById('f_ano');
-    function sync() {
-      if (!fm || !fa) return;
-      if (!fm.value || !fa.value) return;
-      var mv = fm.value, av = fa.value;
-      var m2 = parseInt(mv, 10) - 1, y2 = parseInt(av, 10);
-      var last2 = new Date(y2, m2 + 1, 0).getDate();
-      if (st) st.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-01');
-      if (en) en.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-' + String(last2).padStart(2, '0'));
-      if (pEl) pEl.textContent = periodText(st ? st.value : '', en ? en.value : '');
+      var fm = document.getElementById('f_mes'), fa = document.getElementById('f_ano');
+      function sync() {
+        if (!fm || !fa) return;
+        if (!fm.value || !fa.value) return;
+        var mv = fm.value, av = fa.value;
+        var m2 = parseInt(mv, 10) - 1, y2 = parseInt(av, 10);
+        var last2 = new Date(y2, m2 + 1, 0).getDate();
+        if (st) st.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-01');
+        if (en) en.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-' + String(last2).padStart(2, '0'));
+        if (pEl) { try { pEl.textContent = periodText(st ? st.value : '', en ? en.value : ''); } catch (e) {} }
+      }
+      fm && fm.addEventListener('change', sync);
+      fa && fa.addEventListener('change', sync);
+    } catch (outerInit) {
+      try { MCF.toast('Erro ao inicializar lançamentos.', 'error'); } catch (_) {}
+    } finally {
+      try { load(); } catch (_) {}
     }
-    fm && fm.addEventListener('change', sync);
-    fa && fa.addEventListener('change', sync);
-
-    load();
   });
+
+  // ======================================================================
+  // WATCHDOG GLOBAL DE ÚLTIMA INSTÂNCIA (fora de try/catch, setInterval)
+  // Roda a cada 300ms e, se 8s após abrir a página ainda houver skeleton
+  // visível, FORÇA sair do modo carregamento via DOM direto.
+  // Isso é o que impede 100% o "carregando infinito" independente de
+  // qualquer throw antes, durante ou depois do load().
+  // ======================================================================
+  (function watchdog() {
+    try {
+      var startedAt = Date.now();
+      var WATCHDOG_MAX_MS = 8000;
+      var alreadyFixed = false;
+      var id = setInterval(function () {
+        try {
+          if (alreadyFixed) { clearInterval(id); return; }
+          if (Date.now() - startedAt < WATCHDOG_MAX_MS) return;
+          var stillLoading = false;
+          var sk = document.querySelectorAll('.skeleton');
+          (sk || []).forEach(function (el) { if (el.offsetParent !== null) stillLoading = true; });
+          var txTbody = document.getElementById('txTbody');
+          if (txTbody && /Carregando/i.test(txTbody.innerText || '')) stillLoading = true;
+          if (!stillLoading) { alreadyFixed = true; clearInterval(id); return; }
+          // Força saída
+          alreadyFixed = true;
+          clearInterval(id);
+          if (typeof loaded === 'undefined' || !loaded) { loaded = []; }
+          try { _forceLoadFinish(true); } catch (_) {}
+          // fallback final: DOM direto
+          try {
+            (sk || []).forEach(function (el) { el.style.display = 'none'; });
+            if (txTbody) txTbody.innerHTML =
+              '<tr><td colspan="7" class="px-5 py-16 text-center">' +
+                '<div class="mx-auto h-14 w-14 rounded-3xl grid place-items-center mb-3" style="background: linear-gradient(180deg, rgba(30,58,107,.5), rgba(5,12,26,.9)); border:1px solid rgba(59,130,246,.2); color:#93c5fd;">' +
+                  '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6M12 4v4m0 8v4M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/></svg>' +
+                '</div>' +
+                '<p class="text-lg font-black text-royal-100/90">Nenhum lançamento encontrado</p>' +
+                '<p class="text-sm mt-1 text-royal-300/70">Ajuste os filtros ou crie um novo lançamento (atalho: N)</p>' +
+              '</td></tr>';
+            try { MCF.toast('Recarregue a página para tentar novamente.', 'warn'); } catch (_) {}
+          } catch (fatal) {}
+        } catch (e) { /* guarda final: não propagar */ }
+      }, 300);
+    } catch (outerWd) {}
+  })();
 })();

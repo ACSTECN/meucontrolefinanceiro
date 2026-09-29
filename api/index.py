@@ -5,6 +5,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.routes import categories as categories_router
 from app.routes import dashboard as dashboard_router
@@ -13,6 +16,20 @@ from app.routes import transactions as transactions_router
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+
+
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    """Força navegadores a sempre revalidar arquivos /static (evita cache velho de JS/CSS)."""
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        path = request.url.path or ""
+        if path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        else:
+            response.headers["Cache-Control"] = "no-cache, max-age=0"
+        return response
 
 
 def create_app() -> FastAPI:
@@ -31,6 +48,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
+    app.add_middleware(NoCacheStaticMiddleware)
 
     static_dir = BASE_DIR / "static"
     if static_dir.exists():

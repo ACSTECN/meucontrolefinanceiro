@@ -50,7 +50,7 @@
       <div id="periodLabel" class="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold"
            style="color:#93c5fd; background: linear-gradient(180deg, rgba(37,99,235,0.18), rgba(14,29,54,0.6)); border:1px solid rgba(59,130,246,0.28);"></div>
     </div>
-    <form id="filterForm" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 items-end">
+    <form id="filterForm" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 items-end">
       <div>
         <label class="label" for="f_mes">Mês</label>
         <select id="f_mes" class="field-soft"></select>
@@ -78,6 +78,20 @@
       <div>
         <label class="label" for="f_cat">Categoria</label>
         <select id="f_cat" class="field-soft"><option value="">Todas</option></select>
+      </div>
+      <div>
+        <label class="label" for="f_pag">Forma pgto</label>
+        <select id="f_pag" class="field-soft">
+          <option value="">Todas</option>
+          <option>PIX</option>
+          <option>Dinheiro</option>
+          <option>Débito</option>
+          <option>Cartão de crédito</option>
+          <option>Empréstimo</option>
+          <option>Transferência</option>
+          <option>Boleto</option>
+          <option>Outro</option>
+        </select>
       </div>
       <div class="flex items-end gap-2 xl:col-span-1">
         <button type="submit" class="btn-primary !px-4 flex-1">Aplicar</button>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light" />
     <title>Meu Controle Financeiro{% if title_extra %} · {{ title_extra }}{% endif %}</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect rx='14' ry='14' width='64' height='64' fill='%230ea5e9'/><text x='50%25' y='57%25' text-anchor='middle' font-family='Arial' font-size='34' font-weight='700' fill='white'>R$</text></svg>" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0%25' stop-color='%230ea5e9'/><stop offset='100%25' stop-color='%236366f1'/></linearGradient></defs><rect rx='14' ry='14' width='64' height='64' fill='url(%23g)'/><text x='50%25' y='58%25' text-anchor='middle' font-family='Inter, Arial' font-size='30' font-weight='800' fill='white'>R$</text></svg>" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
     <script>
       tailwind.config = {
@@ -14,15 +14,38 @@
             fontFamily: {
               sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
             },
+            boxShadow: {
+              soft: '0 8px 30px rgba(15, 23, 42, 0.06)',
+            },
             colors: {
               brand: {
-                50:  '#eff6ff',
-                100: '#dbeafe',
-                500: '#0ea5e9',
-                600: '#0284c7',
-                700: '#0369a1',
-                900: '#0c4a6e',
+                50:  '#eef2ff',
+                100: '#e0e7ff',
+                500: '#4f46e5',
+                600: '#4338ca',
+                700: '#3730a3',
+                900: '#1e1b4b',
               },
+              income: {
+                50:  '#ecfdf5',
+                100: '#d1fae5',
+                500: '#10b981',
+                600: '#059669',
+                700: '#047857',
+              },
+              outcome: {
+                50:  '#fef2f2',
+                100: '#fee2e2',
+                500: '#ef4444',
+                600: '#dc2626',
+                700: '#b91c1c',
+              },
+              warn: {
+                50:  '#fffbeb',
+                100: '#fef3c7',
+                500: '#f59e0b',
+                600: '#d97706',
+              }
             },
           },
         },
@@ -30,73 +53,162 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/css/app.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>window.__ENV_NOTE__ = {{ env_note | tojson | safe }};</script>
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased">
+  <body class="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/20 to-blue-50/40 text-slate-800 font-sans antialiased">
     <div class="flex min-h-screen">
-      <aside id="sidebar" class="hidden md:flex md:w-64 md:flex-col bg-white border-r border-slate-200">
+      <aside id="sidebar" class="hidden md:flex md:w-72 md:flex-col bg-white/90 backdrop-blur border-r border-slate-200 shadow-soft">
         <div class="p-5 border-b border-slate-100">
           <div class="flex items-center gap-3">
-            <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-white font-bold shadow-sm">R$</div>
+            <div class="h-11 w-11 rounded-2xl bg-gradient-to-br from-brand-500 via-sky-500 to-indigo-600 grid place-items-center text-white font-extrabold shadow-soft">R$</div>
             <div>
-              <p class="text-sm text-slate-500">Sistema pessoal</p>
-              <h1 class="text-lg font-bold text-slate-900">Meu Controle Financeiro</h1>
+              <p class="text-xs text-slate-500 font-medium">Bem-vindo de volta</p>
+              <h1 class="text-lg font-extrabold text-slate-900 leading-tight">Meu Controle Financeiro</h1>
             </div>
           </div>
         </div>
-        <nav class="flex-1 p-3 space-y-1">
+        <nav class="flex-1 p-4 space-y-1.5">
           {% set _path = request.url.path %}
-          {% macro navlink(endpoint, label, icon) %}
+          {% macro navlink(endpoint, label, icon, sub) %}
             {% set _active = (endpoint == '/' and _path == '/') or (endpoint != '/' and _path.startswith(endpoint)) %}
-            <a href="{{ endpoint }}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition {{ 'bg-brand-50 text-brand-700 ring-1 ring-brand-100' if _active else 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' }}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-{{ icon }}"/></svg>
-              <span>{{ label }}</span>
+            <a href="{{ endpoint }}" class="group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-semibold transition {{ 'bg-gradient-to-r from-brand-50 to-sky-50 text-brand-700 ring-1 ring-brand-100 shadow-sm' if _active else 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' }}">
+              <div class="h-8 w-8 grid place-items-center rounded-xl {{ 'bg-white text-brand-600 shadow-sm ring-1 ring-brand-100' if _active else 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-700 ring-1 ring-transparent group-hover:ring-slate-200' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-{{ icon }}"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <span>{{ label }}</span>
+                  {% if sub %}<kbd class="hidden lg:inline-block text-[10px] font-mono text-slate-400 bg-white ring-1 ring-slate-200 rounded-md px-1.5 py-0.5">{{ sub }}</kbd>{% endif %}
+                </div>
+              </div>
             </a>
           {% endmacro %}
-          {{ navlink('/', 'Dashboard', 'dashboard') }}
-          {{ navlink('/lancamentos', 'Lançamentos', 'list') }}
-          {{ navlink('/novo', 'Novo Lançamento', 'plus') }}
+          {{ navlink('/', 'Dashboard', 'dashboard', 'D') }}
+          {{ navlink('/lancamentos', 'Lançamentos', 'list', 'L') }}
+          {{ navlink('/novo?tipo=RECEITA', 'Nova Receita', 'income', 'R') }}
+          {{ navlink('/novo?tipo=DESPESA', 'Nova Despesa', 'outcome', 'E') }}
+          {{ navlink('/novo', 'Novo Lançamento', 'plus', 'N') }}
+
+          <div class="pt-4 mt-3 border-t border-slate-100">
+            <p class="px-3.5 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Atalhos rápidos</p>
+            <div class="grid grid-cols-2 gap-2 px-1.5">
+              <a href="/novo?tipo=RECEITA&valor=5000&descricao=Salário&categoria=Salário&forma_pagamento=PIX" class="rounded-2xl p-3 bg-income-50 text-income-700 hover:bg-income-100 transition ring-1 ring-income-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">+ Receita</p>
+                <p class="text-sm font-extrabold mt-0.5">Salário</p>
+              </a>
+              <a href="/novo?tipo=DESPESA&forma_pagamento=PIX&categoria=Mercado" class="rounded-2xl p-3 bg-outcome-50 text-outcome-700 hover:bg-outcome-100 transition ring-1 ring-outcome-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">- Despesa</p>
+                <p class="text-sm font-extrabold mt-0.5">Mercado</p>
+              </a>
+              <a href="/novo?tipo=DESPESA&forma_pagamento=Cartão de crédito&categoria=Alimentação" class="rounded-2xl p-3 bg-warn-50 text-warn-600 hover:bg-warn-100 transition ring-1 ring-warn-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">Cartão</p>
+                <p class="text-sm font-extrabold mt-0.5">Alimentação</p>
+              </a>
+              <a href="/lancamentos?mes=09&ano=2026" class="rounded-2xl p-3 bg-brand-50 text-brand-700 hover:bg-brand-100 transition ring-1 ring-brand-100">
+                <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">Filtro</p>
+                <p class="text-sm font-extrabold mt-0.5">Este Mês</p>
+              </a>
+            </div>
+          </div>
         </nav>
         <div class="p-4 text-xs text-slate-400 border-t border-slate-100">
-          <p>V1 · Powered by FastAPI + Supabase</p>
-          <p class="mt-1 text-brand-600">Sua privacidade em primeiro lugar.</p>
+          <p class="font-semibold text-slate-500">Dica</p>
+          <p class="mt-1 leading-relaxed">Aperte <kbd class="px-1.5 py-0.5 bg-white ring-1 ring-slate-200 rounded font-mono text-[10px] text-slate-500">N</kbd> p/ novo lançamento · <kbd class="px-1.5 py-0.5 bg-white ring-1 ring-slate-200 rounded font-mono text-[10px] text-slate-500">D</kbd> dashboard · <kbd class="px-1.5 py-0.5 bg-white ring-1 ring-slate-200 rounded font-mono text-[10px] text-slate-500">L</kbd> lançamentos · <kbd class="px-1.5 py-0.5 bg-white ring-1 ring-slate-200 rounded font-mono text-[10px] text-slate-500">Esc</kbd> voltar</p>
         </div>
       </aside>
 
       <div class="flex-1 min-w-0 flex flex-col">
+        <!-- TOPBAR DESKTOP -->
+        <header class="hidden md:block sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
+          <div class="mx-auto max-w-7xl px-6 py-3.5 flex items-center gap-4">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-slate-400" id="todayTopBarLabel">Data</p>
+              <h2 class="text-lg font-extrabold text-slate-900 truncate" id="todayTopBarTitle">Controle de setembro</h2>
+            </div>
+            <div class="hidden lg:block relative max-w-sm w-full">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input id="globalSearch" placeholder="Buscar descrição, categoria, observação..." class="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-slate-50 ring-1 ring-slate-200 text-sm placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none transition">
+            </div>
+            <div class="flex items-center gap-2">
+              <a href="/novo?tipo=RECEITA" class="inline-flex items-center gap-2 rounded-2xl bg-income-500 hover:bg-income-600 text-white px-4 py-2.5 text-sm font-bold shadow-sm transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Receita
+              </a>
+              <a href="/novo?tipo=DESPESA" class="inline-flex items-center gap-2 rounded-2xl bg-outcome-500 hover:bg-outcome-600 text-white px-4 py-2.5 text-sm font-bold shadow-sm transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Despesa
+              </a>
+              <a href="/novo" class="hidden xl:inline-flex items-center gap-2 rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white px-5 py-2.5 text-sm font-extrabold shadow-soft transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-plus"/></svg>
+                Novo Lançamento
+                <kbd class="ml-2 hidden xl:inline-block text-[10px] font-mono bg-white/20 rounded-md px-1.5 py-0.5 border border-white/20">N</kbd>
+              </a>
+            </div>
+          </div>
+        </header>
+
         <header class="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3">
           <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-white font-bold">R$</div>
+            <div class="h-10 w-10 rounded-2xl bg-gradient-to-br from-brand-500 via-sky-500 to-indigo-600 grid place-items-center text-white font-extrabold shadow-sm">R$</div>
             <div>
-              <p class="text-xs text-slate-500">Sistema pessoal</p>
-              <h1 class="text-base font-bold text-slate-900 leading-tight">Meu Controle Financeiro</h1>
+              <p class="text-[11px] text-slate-500 font-semibold">Sistema pessoal</p>
+              <h1 class="text-base font-extrabold text-slate-900 leading-tight">Meu Controle Financeiro</h1>
             </div>
           </div>
-          <button id="menuToggle" aria-label="Abrir menu" class="inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-slate-600">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <a href="/novo" class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 text-white p-2.5 shadow-sm" aria-label="Novo lançamento">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-plus"/></svg>
+            </a>
+            <button id="menuToggle" aria-label="Abrir menu" class="inline-flex items-center justify-center rounded-2xl border border-slate-200 p-2.5 text-slate-600 bg-white">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+          </div>
         </header>
 
         <div id="mobileDrawer" class="md:hidden">
           <div id="drawerBackdrop" class="hidden fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"></div>
-          <div id="drawerPanel" class="hidden fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl">
+          <div id="drawerPanel" class="hidden fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-2xl">
             <div class="p-4 border-b border-slate-100 flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-white font-bold">R$</div>
-                <h1 class="font-bold text-slate-900">Meu Controle Financeiro</h1>
+                <div class="h-10 w-10 rounded-2xl bg-gradient-to-br from-brand-500 via-sky-500 to-indigo-600 grid place-items-center text-white font-extrabold shadow-sm">R$</div>
+                <div>
+                  <p class="text-[11px] text-slate-500 font-semibold">Sistema pessoal</p>
+                  <h1 class="text-base font-extrabold text-slate-900 leading-tight">Meu Controle Financeiro</h1>
+                </div>
               </div>
-              <button id="drawerClose" aria-label="Fechar menu" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <button id="drawerClose" aria-label="Fechar menu" class="rounded-2xl p-2.5 text-slate-500 hover:bg-slate-100">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <nav class="p-3 space-y-1">
-              <a href="/" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900">Dashboard</a>
-              <a href="/lancamentos" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900">Lançamentos</a>
-              <a href="/novo" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900">Novo Lançamento</a>
+            <nav class="p-3 space-y-1.5">
+              <a href="/" class="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <div class="h-8 w-8 grid place-items-center rounded-xl bg-slate-100">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-dashboard"/></svg>
+                </div>
+                Dashboard
+              </a>
+              <a href="/lancamentos" class="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                <div class="h-8 w-8 grid place-items-center rounded-xl bg-slate-100">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-list"/></svg>
+                </div>
+                Lançamentos
+              </a>
+              <a href="/novo?tipo=RECEITA" class="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-income-700 bg-income-50 hover:bg-income-100">
+                <div class="h-8 w-8 grid place-items-center rounded-xl bg-white shadow-sm">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-income"/></svg>
+                </div>
+                Nova Receita
+              </a>
+              <a href="/novo?tipo=DESPESA" class="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-outcome-700 bg-outcome-50 hover:bg-outcome-100">
+                <div class="h-8 w-8 grid place-items-center rounded-xl bg-white shadow-sm">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-outcome"/></svg>
+                </div>
+                Nova Despesa
+              </a>
             </nav>
           </div>
         </div>
@@ -104,18 +216,23 @@
         <!-- Icon sprite (inline) -->
         <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
           <defs>
-            <symbol id="icon-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+            <symbol id="icon-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></symbol>
             <symbol id="icon-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
             <symbol id="icon-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
             <symbol id="icon-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></symbol>
             <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+            <symbol id="icon-income" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></symbol>
+            <symbol id="icon-outcome" viewBox="0 0 24 24"><path d="M12 19V5M19 12l-7-7-7 7"/></symbol>
+            <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+            <symbol id="icon-money" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></symbol>
+            <symbol id="icon-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
           </defs>
         </svg>
 
         <main class="flex-1">
           <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
             <div id="toastStack" class="fixed top-4 right-4 z-50 space-y-2"></div>
-            <div id="envNote" class="hidden mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"></div>
+            <div id="envNote" class="hidden mb-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-3.5 text-sm text-amber-900 shadow-sm ring-1 ring-amber-100"></div>
 
             {% block content %}{% endblock %}
           </div>

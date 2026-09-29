@@ -1,41 +1,119 @@
 {% extends "base.html" %}
 {% block content %}
 <section>
-  <header class="flex flex-wrap items-end justify-between gap-3 mb-6">
+  <header class="flex flex-wrap items-end justify-between gap-4 mb-6">
     <div>
-      <h2 class="text-2xl font-bold text-slate-900">Dashboard</h2>
-      <p class="text-sm text-slate-500 mt-0.5">
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full bg-brand-50 text-brand-700 ring-1 ring-brand-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">
+          <span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>
+          Visão geral
+        </span>
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Dashboard</h2>
+      <p class="text-sm text-slate-500 mt-1">
         Acompanhe receitas, despesas e seu saldo no período selecionado.
       </p>
     </div>
-    <div class="flex gap-2">
-      <button id="btnMesAtual" class="btn btn-ghost">Mês atual</button>
-      <a href="/novo" class="btn btn-primary">+ Novo Lançamento</a>
+    <div class="flex items-center gap-2">
+      <button id="btnMesAtual" class="inline-flex items-center gap-2 rounded-2xl bg-white text-slate-700 hover:bg-slate-50 px-4 py-2.5 text-sm font-bold ring-1 ring-slate-200 shadow-sm transition">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-calendar"/></svg>
+        Mês atual
+      </button>
+      <a href="/novo?tipo=RECEITA" class="inline-flex items-center gap-2 rounded-2xl bg-income-500 hover:bg-income-600 text-white px-4 py-2.5 text-sm font-bold shadow-sm transition">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-plus"/></svg>
+        Receita
+      </a>
+      <a href="/novo?tipo=DESPESA" class="inline-flex items-center gap-2 rounded-2xl bg-outcome-500 hover:bg-outcome-600 text-white px-4 py-2.5 text-sm font-bold shadow-sm transition">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-plus"/></svg>
+        Despesa
+      </a>
     </div>
   </header>
 
-  <section class="card p-4 sm:p-5 mb-6 no-print">
-    <h3 class="text-sm font-semibold text-slate-700 mb-3">Período e filtros</h3>
-    <form id="filterForm" class="filters-row">
+  <!-- Quick actions -->
+  <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6 no-print">
+    <a href="/novo?tipo=RECEITA&valor=5000&descricao=Salário&categoria=Salário&forma_pagamento=PIX" class="group relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-income-500 to-emerald-600 text-white shadow-soft hover:-translate-y-0.5 transition">
+      <div class="absolute -right-6 -bottom-8 h-32 w-32 rounded-full bg-white/10 blur-xl"></div>
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-2xl bg-white/15 grid place-items-center ring-1 ring-white/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-income"/></svg>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wider opacity-80">Rápido</p>
+          <p class="text-lg font-extrabold leading-tight">+ Salário</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-white/90 leading-relaxed">R$ 5.000,00 · PIX · seta tudo pronto</p>
+    </a>
+    <a href="/novo?tipo=DESPESA&valor=850&descricao=Mercado do mês&categoria=Mercado&forma_pagamento=Cartão de crédito&cartao_nome=Nubank&qtd_parcelas=1" class="group relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-outcome-500 to-rose-600 text-white shadow-soft hover:-translate-y-0.5 transition">
+      <div class="absolute -right-6 -bottom-8 h-32 w-32 rounded-full bg-white/10 blur-xl"></div>
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-2xl bg-white/15 grid place-items-center ring-1 ring-white/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-outcome"/></svg>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wider opacity-80">Rápido</p>
+          <p class="text-lg font-extrabold leading-tight">− Mercado</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-white/90 leading-relaxed">R$ 850,00 · Cartão Nubank · 1 parcela</p>
+    </a>
+    <a href="/novo?tipo=DESPESA&categoria=Alimentação&forma_pagamento=PIX" class="group relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-warn-500 to-amber-500 text-white shadow-soft hover:-translate-y-0.5 transition">
+      <div class="absolute -right-6 -bottom-8 h-32 w-32 rounded-full bg-white/10 blur-xl"></div>
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-2xl bg-white/15 grid place-items-center ring-1 ring-white/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-money"/></svg>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wider opacity-80">Rápido</p>
+          <p class="text-lg font-extrabold leading-tight">Almoço/Refeição</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-white/90 leading-relaxed">Categoria Alimentação · PIX</p>
+    </a>
+    <a href="/lancamentos" class="group relative overflow-hidden rounded-3xl p-5 bg-gradient-to-br from-brand-500 to-indigo-600 text-white shadow-soft hover:-translate-y-0.5 transition">
+      <div class="absolute -right-6 -bottom-8 h-32 w-32 rounded-full bg-white/10 blur-xl"></div>
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-2xl bg-white/15 grid place-items-center ring-1 ring-white/20">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-list"/></svg>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-wider opacity-80">Consultar</p>
+          <p class="text-lg font-extrabold leading-tight">Lançamentos</p>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-white/90 leading-relaxed">Ver todos · editar · excluir</p>
+    </a>
+  </section>
+
+  <section class="card-soft p-4 sm:p-6 mb-6 no-print rounded-3xl">
+    <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+      <div>
+        <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Período e filtros</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Use mês/ano OU data inicial/final para o consolidado.</p>
+      </div>
+      <div id="periodLabel" class="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"></div>
+    </div>
+    <form id="filterForm" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 items-end">
       <div>
         <label class="label" for="f_mes">Mês</label>
-        <select id="f_mes" class="field"></select>
+        <select id="f_mes" class="field rounded-2xl"></select>
       </div>
       <div>
         <label class="label" for="f_ano">Ano</label>
-        <select id="f_ano" class="field"></select>
+        <select id="f_ano" class="field rounded-2xl"></select>
       </div>
       <div>
         <label class="label" for="f_start">Data inicial</label>
-        <input id="f_start" type="date" class="field" />
+        <input id="f_start" type="date" class="field rounded-2xl" />
       </div>
       <div>
         <label class="label" for="f_end">Data final</label>
-        <input id="f_end" type="date" class="field" />
+        <input id="f_end" type="date" class="field rounded-2xl" />
       </div>
       <div>
         <label class="label" for="f_type">Tipo</label>
-        <select id="f_type" class="field">
+        <select id="f_type" class="field rounded-2xl">
           <option value="">Todos</option>
           <option value="RECEITA">Receitas</option>
           <option value="DESPESA">Despesas</option>
@@ -43,11 +121,11 @@
       </div>
       <div>
         <label class="label" for="f_cat">Categoria</label>
-        <select id="f_cat" class="field"><option value="">Todas</option></select>
+        <select id="f_cat" class="field rounded-2xl"><option value="">Todas</option></select>
       </div>
       <div>
         <label class="label" for="f_pag">Forma de pagamento</label>
-        <select id="f_pag" class="field">
+        <select id="f_pag" class="field rounded-2xl">
           <option value="">Todas</option>
           <option>PIX</option>
           <option>Dinheiro</option>
@@ -58,48 +136,87 @@
           <option>Outro</option>
         </select>
       </div>
-      <div class="sm:col-span-2 md:col-span-1 lg:col-span-2 flex items-end gap-2">
-        <button type="submit" class="btn btn-primary w-full sm:w-auto">Aplicar filtros</button>
-        <button type="reset" id="btnReset" class="btn btn-ghost w-full sm:w-auto">Limpar</button>
+      <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-1">
+        <button type="submit" class="btn-primary !px-5 flex-1">Aplicar</button>
+        <button type="reset" id="btnReset" class="btn-ghost flex-1">Limpar</button>
       </div>
     </form>
   </section>
 
+  <!-- KPIs -->
   <section id="kpis" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-6">
-    <div class="skeleton h-28"></div>
-    <div class="skeleton h-28"></div>
-    <div class="skeleton h-28"></div>
-    <div class="skeleton h-28"></div>
-    <div class="skeleton h-28"></div>
-    <div class="skeleton h-28"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
+    <div class="skeleton h-32 rounded-3xl"></div>
   </section>
 
-  <section class="grid gap-6 lg:grid-cols-3 mb-6">
-    <div class="card p-4 sm:p-5 lg:col-span-2">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-semibold text-slate-700">Receitas x Despesas (por dia)</h3>
-        <span id="periodLabel" class="text-xs text-slate-500"></span>
+  <section id="emptyState" class="hidden card-soft rounded-3xl p-10 text-center mb-6">
+    <div class="mx-auto h-16 w-16 rounded-3xl bg-gradient-to-br from-brand-100 to-sky-100 grid place-items-center ring-1 ring-brand-100 mb-4">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-plus"/></svg>
+    </div>
+    <h3 class="text-xl font-extrabold text-slate-900">Sem lançamentos no período</h3>
+    <p class="text-sm text-slate-500 mt-1 max-w-xl mx-auto">Comece clicando nos atalhos acima ou no botão "+ Novo Lançamento". Dados de exemplo são exibidos automaticamente enquanto você não cadastra nada.</p>
+    <div class="mt-5 flex items-center justify-center gap-2 flex-wrap">
+      <a href="/novo?tipo=RECEITA" class="btn-income px-6">Cadastrar Receita</a>
+      <a href="/novo?tipo=DESPESA" class="btn-outcome px-6">Cadastrar Despesa</a>
+    </div>
+  </section>
+
+  <section class="grid gap-5 lg:grid-cols-3 mb-6">
+    <div class="card-soft rounded-3xl p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Receitas x Despesas</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Evolução diária no período selecionado.</p>
+        </div>
       </div>
-      <div class="chart-wrap tall"><canvas id="chartSeries"></canvas></div>
+      <div class="chart-wrap tall rounded-2xl bg-white ring-1 ring-slate-100 p-3"><canvas id="chartSeries"></canvas></div>
     </div>
-    <div class="card p-4 sm:p-5">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Últimas movimentações</h3>
-      <ol id="ultimasList" class="space-y-2 text-sm"></ol>
+    <div class="card-soft rounded-3xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Últimas movimentações</h3>
+          <p class="text-xs text-slate-500 mt-0.5">10 mais recentes.</p>
+        </div>
+        <a href="/lancamentos" class="text-xs font-bold text-brand-600 hover:text-brand-700">Ver todos →</a>
+      </div>
+      <ol id="ultimasList" class="space-y-2 text-sm max-h-[360px] overflow-y-auto pr-1"></ol>
     </div>
   </section>
 
-  <section class="grid gap-6 lg:grid-cols-3 mb-6">
-    <div class="card p-4 sm:p-5">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Receitas por categoria</h3>
-      <div class="chart-wrap"><canvas id="chartIncCat"></canvas></div>
+  <section class="grid gap-5 lg:grid-cols-3 mb-6">
+    <div class="card-soft rounded-3xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Receitas por categoria</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Distribuição percentual.</p>
+        </div>
+        <span class="inline-flex items-center gap-1 rounded-full bg-income-50 text-income-700 px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ring-income-100">Receitas</span>
+      </div>
+      <div class="chart-wrap rounded-2xl bg-white ring-1 ring-slate-100 p-3"><canvas id="chartIncCat"></canvas></div>
     </div>
-    <div class="card p-4 sm:p-5">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Despesas por categoria</h3>
-      <div class="chart-wrap"><canvas id="chartExpCat"></canvas></div>
+    <div class="card-soft rounded-3xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Despesas por categoria</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Onde seu dinheiro está indo.</p>
+        </div>
+        <span class="inline-flex items-center gap-1 rounded-full bg-outcome-50 text-outcome-700 px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ring-outcome-100">Despesas</span>
+      </div>
+      <div class="chart-wrap rounded-2xl bg-white ring-1 ring-slate-100 p-3"><canvas id="chartExpCat"></canvas></div>
     </div>
-    <div class="card p-4 sm:p-5">
-      <h3 class="text-sm font-semibold text-slate-700 mb-2">Despesas por forma de pagamento</h3>
-      <div class="chart-wrap"><canvas id="chartPag"></canvas></div>
+    <div class="card-soft rounded-3xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-extrabold text-slate-800 uppercase tracking-wider">Despesas por pagamento</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Por forma de pagamento.</p>
+        </div>
+        <span class="inline-flex items-center gap-1 rounded-full bg-warn-50 text-warn-600 px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ring-warn-100">Pagamentos</span>
+      </div>
+      <div class="chart-wrap rounded-2xl bg-white ring-1 ring-slate-100 p-3"><canvas id="chartPag"></canvas></div>
     </div>
   </section>
 </section>

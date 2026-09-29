@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date as _date
 from typing import Any, Dict, Iterable, List, Optional
 from uuid import UUID, uuid4
 
@@ -114,6 +114,118 @@ _CATEGORIES_SEED: List[Dict[str, Any]] = [
 
 def _ts_now_iso() -> str:
     return datetime.now().astimezone().isoformat()
+
+
+def _demo_transactions() -> List[Dict[str, Any]]:
+    """Lançamentos de exemplo para fallback em memória (modo local). Mostra
+    dados no dashboard mesmo sem Supabase configurado. Não é usado em
+    ambiente de teste (testes sempre passam fixtures explícitas)."""
+    today = _date.today()
+    y, m = today.year, today.month
+
+    def iso(d: int) -> str:
+        return f"{y:04d}-{m:02d}-{d:02d}"
+
+    def catid(slug: str) -> Optional[UUID]:
+        for c in _CATEGORIES_SEED:
+            if c["slug"] == slug:
+                return c["id"]
+        return None
+
+    samples = [
+        {
+            "tipo": "RECEITA",
+            "descricao": "Salário",
+            "category_id": catid("salario"),
+            "valor": "7500.00",
+            "data": iso(5),
+            "forma_pagamento": "PIX",
+            "observacao": "Salário mensal",
+        },
+        {
+            "tipo": "RECEITA",
+            "descricao": "Freelance de site",
+            "category_id": catid("freelance"),
+            "valor": "1800.00",
+            "data": iso(12),
+            "forma_pagamento": "Transferência",
+            "observacao": "Projeto landing page",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Aluguel + condomínio",
+            "category_id": catid("moradia"),
+            "valor": "2200.00",
+            "data": iso(8),
+            "forma_pagamento": "Boleto",
+            "observacao": "",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Supermercado semanal",
+            "category_id": catid("mercado"),
+            "valor": "860.90",
+            "data": iso(14),
+            "forma_pagamento": "Cartão de crédito",
+            "cartao_nome": "Nubank Ultravioleta",
+            "qtd_parcelas": 1,
+            "parcela_atual": 1,
+            "observacao": "Compras do mês",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Restaurante com a família",
+            "category_id": catid("alimentacao"),
+            "valor": "258.50",
+            "data": iso(16),
+            "forma_pagamento": "PIX",
+            "observacao": "Almoço sábado",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Uber / transporte",
+            "category_id": catid("transporte"),
+            "valor": "132.40",
+            "data": iso(18),
+            "forma_pagamento": "Débito",
+            "observacao": "Corridas da semana",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Mensalidade academia",
+            "category_id": catid("academia"),
+            "valor": "129.90",
+            "data": iso(3),
+            "forma_pagamento": "Cartão de crédito",
+            "cartao_nome": "Nubank Ultravioleta",
+            "qtd_parcelas": 1,
+            "parcela_atual": 1,
+            "observacao": "",
+        },
+        {
+            "tipo": "DESPESA",
+            "descricao": "Netflix / Spotify",
+            "category_id": catid("assinaturas"),
+            "valor": "74.80",
+            "data": iso(1),
+            "forma_pagamento": "Cartão de crédito",
+            "cartao_nome": "Nubank Ultravioleta",
+            "qtd_parcelas": 1,
+            "parcela_atual": 1,
+            "observacao": "Assinaturas mensais",
+        },
+    ]
+    out: List[Dict[str, Any]] = []
+    for idx, s in enumerate(samples):
+        out.append(
+            {
+                "id": UUID(f"99999999-9999-9999-9999-99999999999{idx}"),
+                "created_at": _ts_now_iso(),
+                "updated_at": _ts_now_iso(),
+                **s,
+            }
+        )
+    return out
 
 
 class InMemoryTransactionRepository:
@@ -367,5 +479,5 @@ def get_default_repository() -> TransactionRepository:
     if sb is not None:
         return SupabaseTransactionRepository(sb)  # type: ignore[return-value]
     if _fallback_repo is None:
-        _fallback_repo = InMemoryTransactionRepository()
+        _fallback_repo = InMemoryTransactionRepository(transactions=_demo_transactions())
     return _fallback_repo  # type: ignore[return-value]

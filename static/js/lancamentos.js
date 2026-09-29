@@ -1,6 +1,27 @@
-/* lancamentos.js - tabela e cards de lançamentos */
+/* lancamentos.js - tela de lançamentos (filtros, tabela, delete) */
 (function () {
   'use strict';
+
+  var loaded = []; // array de transactions brutas
+  var localSearch = '';
+  var quickType = '';
+  var quickPag = '';
+
+  function isoToDate(s) {
+    if (!s) return null;
+    var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3]);
+  }
+  function periodText(s, e) {
+    var ds = isoToDate(s), de = isoToDate(e);
+    if (!ds || !de) return MCF.formatDateBR(s) + ' a ' + MCF.formatDateBR(e);
+    var sameMonth = ds.getFullYear() === de.getFullYear() && ds.getMonth() === de.getMonth();
+    var lastDayOfMonth = new Date(de.getFullYear(), de.getMonth() + 1, 0).getDate();
+    var wholeMonth = sameMonth && ds.getDate() === 1 && de.getDate() === lastDayOfMonth;
+    if (wholeMonth) return MCF.MONTHS[ds.getMonth()] + ' / ' + ds.getFullYear();
+    return MCF.formatDateBR(s) + ' · até ' + MCF.formatDateBR(e);
+  }
 
   function fillMonthYear(f) {
     var mes = document.getElementById('f_mes');
@@ -18,8 +39,10 @@
       o.textContent = String(y);
       ano.appendChild(o);
     }
-    mes.value = f.month;
-    ano.value = f.year;
+    var mm = f.month || f.mes;
+    var yy = f.year  || f.ano;
+    if (mm) mes.value = String(mm);
+    if (yy) ano.value = String(yy);
   }
 
   function fillCategoryOptions(cats, f) {
@@ -42,18 +65,21 @@
 
   function getFormFilters() {
     var month = document.getElementById('f_mes').value;
-    var year = document.getElementById('f_ano').value;
+    var year  = document.getElementById('f_ano').value;
     var start = document.getElementById('f_start').value;
-    var end = document.getElementById('f_end').value;
+    var end   = document.getElementById('f_end').value;
     if (!start && !end && month && year) {
-      var m = parseInt(month, 10) - 1;
-      var y = parseInt(year, 10);
+      var m = parseInt(month, 10) - 1, y = parseInt(year, 10);
       var last = new Date(y, m + 1, 0);
-      var iso = function (d, m, y) {
-        return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      };
-      start = iso(1, m + 1, y);
-      end = iso(last.getDate(), m + 1, y);
+      if (!window.__tmpIso) {
+        window.__tmpIso = function (d, m, y) {
+          var mm = String(m).padStart(2, '0');
+          var dd = String(d).padStart(2, '0');
+          return y + '-' + mm + '-' + dd;
+        };
+      }
+      start = window.__tmpIso(1, m + 1, y);
+      end   = window.__tmpIso(last.getDate(), m + 1, y);
     }
     return {
       month: month, year: year, start_date: start, end_date: end,
@@ -64,162 +90,334 @@
   }
 
   function applyFiltersToForm(f) {
-    var map = { f_mes: 'month', f_ano: 'year', f_start: 'start_date', f_end: 'end_date', f_type: 'type', f_cat: 'category', f_pag: 'payment_method' };
-    Object.keys(map).forEach(function (id) {
+    ['f_mes', 'f_ano', 'f_start', 'f_end', 'f_type', 'f_cat', 'f_pag'].forEach(function (id) {
       var el = document.getElementById(id);
-      if (el) el.value = f[map[id]] || '';
+      if (!el) return;
+      var map = { f_mes: 'month', f_ano: 'year', f_start: 'start_date', f_end: 'end_date', f_type: 'type', f_cat: 'category', f_pag: 'payment_method' };
+      var alias = map[id];
+      var v = f[alias] || f[(alias === 'month' ? 'mes' : (alias === 'year' ? 'ano' : alias))] || '';
+      el.value = v;
     });
   }
 
-  function formatSummary(rows) {
-    var rec = 0, des = 0;
-    rows.forEach(function (t) {
-      var v = Number(String(t.valor).replace(',', '.')) || 0;
-      if (t.tipo === 'RECEITA') rec += v;
-      else des += v;
+  function computeSummary(list) {
+    var inc = 0, exp = 0;
+    list.forEach(function (t) {
+      var v = Number(t.valor);
+      if (t.tipo === 'RECEITA') inc += v; else exp += v;
     });
-    var bar = document.getElementById('summaryBar');
-    bar.innerHTML =
-      '<div class="kpi kpi-income"><div class="label">Receitas filtradas</div><div class="value">' + MCF.formatBRL(rec) + '</div></div>' +
-      '<div class="kpi kpi-expense"><div class="label">Despesas filtradas</div><div class="value">' + MCF.formatBRL(des) + '</div></div>' +
-      '<div class="kpi ' + ((rec - des) >= 0 ? 'kpi-balance-pos' : 'kpi-balance-neg') + '"><div class="label">Saldo filtrado</div><div class="value">' + MCF.formatBRL(rec - des) + '</div></div>';
+    return { income: inc, expenses: exp, balance: inc - exp, count: list.length };
   }
 
-  function renderRows(rows) {
-    var tbody = document.getElementById('txTbody');
-    var cards = document.getElementById('txCards');
-    tbody.innerHTML = '';
-    cards.innerHTML = '';
+  function renderSummary(list) {
+    var s = computeSummary(list);
+    var wrap = document.getElementById('summaryBar');
+    if (!wrap) return;
+    var balClass = s.balance >= 0 ? 'kpi-balance-pos' : 'kpi-balance-neg';
+    wrap.innerHTML =
+      kpiCard('kpi-income',
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+        'Receitas', MCF.formatBRL(s.income), s.count + ' lançamento' + (s.count === 1 ? '' : 's') + ' de receita') +
+      kpiCard('kpi-expense',
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M19 12l-7-7-7 7"/></svg>',
+        'Despesas', MCF.formatBRL(s.expenses), 'Total de saídas no período') +
+      kpiCard(balClass,
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>',
+        'Saldo', MCF.formatBRL(s.balance), (s.balance >= 0 ? 'Saldo positivo 🎉' : 'Saldo negativo — atenção'));
+  }
 
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">Nenhum lançamento encontrado. <a class="text-brand-600 underline" href="/novo">Cadastre um agora</a>.</td></tr>';
-      cards.innerHTML = '<div class="tx-card text-center text-slate-500">Nenhum lançamento encontrado.</div>';
-      return;
-    }
-
-    rows.forEach(function (t) {
-      var isRec = t.tipo === 'RECEITA';
-      var rowCls = isRec ? 'row-income' : 'row-expense';
-      var badge = isRec
-        ? '<span class="badge badge-income">Receita</span>'
-        : '<span class="badge badge-expense">Despesa</span>';
-      var valorClass = isRec ? 'text-emerald-700 font-semibold' : 'text-rose-700 font-semibold';
-      var txId = String(t.id);
-      var editUrl = '/editar?id=' + encodeURIComponent(txId);
-      var actions =
-        '<div class="flex justify-end gap-1 no-print">' +
-          '<a href="' + editUrl + '" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">' +
-            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
-            ' Editar' +
-          '</a>' +
-          '<button class="btn-delete inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50" data-id="' + txId + '">' +
-            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>' +
-            ' Excluir' +
-          '</button>' +
-        '</div>';
-
-      // Table row (md+)
-      var tr = document.createElement('tr');
-      tr.className = rowCls + ' hover:bg-white/50 transition';
-      tr.innerHTML =
-        '<td class="whitespace-nowrap px-4 py-3">' + MCF.formatDateBR(t.data) + '</td>' +
-        '<td class="px-4 py-3 max-w-[260px] truncate" title="' + (t.descricao || '') + '">' + (t.descricao || '') + '</td>' +
-        '<td class="px-4 py-3">' + (t.categoria_nome || '') + '</td>' +
-        '<td class="px-4 py-3">' + badge + '</td>' +
-        '<td class="px-4 py-3">' + (t.forma_pagamento || '') + '</td>' +
-        '<td class="whitespace-nowrap px-4 py-3 text-right ' + valorClass + '">' + MCF.formatBRL(t.valor) + '</td>' +
-        '<td class="whitespace-nowrap px-4 py-3 text-right">' + actions + '</td>';
-      tbody.appendChild(tr);
-
-      // Cards (mobile)
-      var card = document.createElement('div');
-      card.className = 'tx-card ' + rowCls;
-      card.innerHTML =
+  function kpiCard(cls, icon, label, value, sub) {
+    return (
+      '<div class="kpi ' + cls + '">' +
         '<div class="flex items-start justify-between gap-3">' +
           '<div class="min-w-0 flex-1">' +
-            '<div class="flex items-center gap-2 mb-1">' + badge +
-              '<span class="text-xs text-slate-500">' + MCF.formatDateBR(t.data) + '</span>' +
-            '</div>' +
-            '<p class="font-semibold text-slate-900 truncate">' + (t.descricao || '') + '</p>' +
-            '<p class="mt-1 text-xs text-slate-500">' + (t.categoria_nome || '') + ' · ' + (t.forma_pagamento || '') + '</p>' +
+            '<div class="label">' + label + '</div>' +
+            '<div class="value">' + value + '</div>' +
+            '<div class="sub line-clamp-1">' + sub + '</div>' +
           '</div>' +
-          '<div class="' + valorClass + ' text-right whitespace-nowrap">' + MCF.formatBRL(t.valor) + '</div>' +
+          '<div class="icon">' + icon + '</div>' +
         '</div>' +
-        '<div class="mt-3 pt-3 border-t border-slate-200 flex justify-end gap-2">' +
-          '<a href="' + editUrl + '" class="btn btn-ghost text-xs">Editar</a>' +
-          '<button class="btn-delete btn btn-danger text-xs" data-id="' + txId + '">Excluir</button>' +
-        '</div>';
-      cards.appendChild(card);
-    });
+      '</div>'
+    );
+  }
 
-    cards.querySelectorAll('.btn-delete, tbody').forEach(function (el) {
-      // handled at root level via delegation
+  function applyLocalFilters(list) {
+    var q = (localSearch || '').toLowerCase().trim();
+    return list.filter(function (t) {
+      if (quickType && t.tipo !== quickType) return false;
+      if (quickPag && t.forma_pagamento !== quickPag) return false;
+      if (!q) return true;
+      var hay = [t.descricao || '', t.categoria_nome || '', t.observacao || '', t.forma_pagamento || ''].join(' ').toLowerCase();
+      return hay.indexOf(q) !== -1;
     });
   }
 
-  function attachDelete() {
-    document.addEventListener('click', async function (e) {
-      var btn = e.target.closest('.btn-delete');
-      if (!btn) return;
-      var id = btn.getAttribute('data-id');
-      if (!id) return;
-      var ok = window.confirm('Tem certeza que deseja EXCLUIR este lançamento? Esta ação não pode ser desfeita.');
-      if (!ok) return;
-      btn.disabled = true;
-      try {
-        await MCF.api('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' });
-        MCF.toast('Lançamento excluído com sucesso.', 'success');
-        load();
-      } catch (err) {
-        MCF.toast(err.message || 'Erro ao excluir.', 'error');
-        btn.disabled = false;
-      }
+  function badgeTipo(t) {
+    return t.tipo === 'RECEITA'
+      ? '<span class="badge badge-income">Receita</span>'
+      : '<span class="badge badge-expense">Despesa</span>';
+  }
+  function badgePgto(pg) {
+    if (!pg) return '<span class="badge badge-default">—</span>';
+    var palettes = {
+      'PIX': ['income', 'Recebido via PIX'],
+      'Cartão de crédito': ['warn',  'Cartão de crédito'],
+      'Débito': ['default', 'Débito'],
+      'Dinheiro': ['default', 'Dinheiro'],
+      'Transferência': ['default', 'Transferência'],
+      'Boleto': ['expense', 'Boleto'],
+      'Outro': ['default', 'Outro'],
+    };
+    var p = palettes[pg] || ['default', pg];
+    var cls = p[0] === 'income' ? 'badge-income' : p[0] === 'expense' ? 'badge-expense' : 'badge-default';
+    return '<span class="badge ' + cls + '">' + pg + '</span>';
+  }
+
+  function formatValor(t) {
+    var sinal = t.tipo === 'RECEITA' ? '+' : '−';
+    var color = t.tipo === 'RECEITA' ? 'text-income-600' : 'text-outcome-600';
+    return '<div class="text-right whitespace-nowrap"><div class="text-sm font-extrabold ' + color + '">' + sinal + MCF.formatBRL(t.valor) + '</div></div>';
+  }
+
+  function renderRows(list) {
+    var tbody = document.getElementById('txTbody');
+    var cards = document.getElementById('txCards');
+    if (!list.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="7" class="px-5 py-16 text-center text-slate-500">' +
+          '<div class="mx-auto h-14 w-14 rounded-3xl bg-slate-100 text-slate-400 grid place-items-center mb-3">' +
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-list"/></svg>' +
+          '</div>' +
+          '<p class="font-bold text-slate-700">Nenhum lançamento encontrado.</p>' +
+          '<p class="text-sm mt-1">Tente ajustar os filtros ou crie um lançamento clicando em "+ Novo Lançamento".</p>' +
+        '</td></tr>';
+      cards.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-center text-slate-500 text-sm">Nenhum lançamento no período.</div>';
+      return;
+    }
+    tbody.innerHTML = list.map(function (t) {
+      return (
+        '<tr class="' + (t.tipo === 'RECEITA' ? 'row-income' : 'row-expense') + ' align-middle">' +
+          '<td class="px-5 py-3.5 whitespace-nowrap">' +
+            '<div class="font-extrabold text-slate-800">' + MCF.formatDateBR(t.data) + '</div>' +
+          '</td>' +
+          '<td class="px-5 py-3.5 min-w-[220px]">' +
+            '<div class="font-bold text-slate-900 truncate max-w-md">' + (t.descricao || '') + '</div>' +
+            (t.observacao ? '<div class="text-xs text-slate-500 truncate max-w-md">' + t.observacao + '</div>' : '') +
+          '</td>' +
+          '<td class="px-5 py-3.5"><span class="badge badge-default">' + (t.categoria_nome || '') + '</span></td>' +
+          '<td class="px-5 py-3.5">' + badgeTipo(t) + '</td>' +
+          '<td class="px-5 py-3.5">' + badgePgto(t.forma_pagamento) + '</td>' +
+          '<td class="px-5 py-3.5 text-right">' + formatValor(t) + '</td>' +
+          '<td class="px-5 py-3.5 text-right no-print whitespace-nowrap">' +
+            '<div class="inline-flex items-center gap-2">' +
+              '<a href="/editar?id=' + encodeURIComponent(t.id) + '" class="btn-ghost !px-3 !py-2 gap-1" title="Editar">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-edit"/></svg>' +
+                '<span class="hidden lg:inline text-xs">Editar</span>' +
+              '</a>' +
+              '<button type="button" data-del="' + t.id + '" class="btn-danger !px-3 !py-2 gap-1 btn-delete" title="Excluir">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-trash"/></svg>' +
+                '<span class="hidden lg:inline text-xs">Excluir</span>' +
+              '</button>' +
+            '</div>' +
+          '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    cards.innerHTML = list.map(function (t) {
+      var valColor = t.tipo === 'RECEITA' ? 'income' : 'expense';
+      var sinal = t.tipo === 'RECEITA' ? '+' : '−';
+      return (
+        '<div class="tx-card !rounded-3xl">' +
+          '<div class="flex items-start justify-between gap-3">' +
+            '<div class="min-w-0 flex-1">' +
+              '<div class="flex flex-wrap items-center gap-2 mb-1">' +
+                badgeTipo(t) + badgePgto(t.forma_pagamento) +
+              '</div>' +
+              '<p class="font-extrabold text-slate-900 text-base truncate">' + (t.descricao || '') + '</p>' +
+              '<p class="text-xs text-slate-500 mt-0.5">' + MCF.formatDateBR(t.data) + ' · ' + (t.categoria_nome || '') + (t.observacao ? ' · ' + t.observacao : '') + '</p>' +
+            '</div>' +
+            '<div class="text-right">' +
+              '<div class="font-extrabold ' + (t.tipo === 'RECEITA' ? 'text-income-600' : 'text-outcome-600') + ' text-lg">' + sinal + MCF.formatBRL(t.valor) + '</div>' +
+              '<div class="flex gap-2 mt-3">' +
+                '<a href="/editar?id=' + encodeURIComponent(t.id) + '" class="btn-ghost !px-2.5 !py-1.5 text-xs">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-edit"/></svg> Editar' +
+                '</a>' +
+                '<button type="button" data-del="' + t.id + '" class="btn-danger !px-2.5 !py-1.5 text-xs btn-delete">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-trash"/></svg> Excluir' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          (t.forma_pagamento === 'Cartão de crédito' && t.cartao_nome
+            ? '<div class="mt-3 text-[11px] font-bold text-warn-600 rounded-2xl bg-warn-50 px-3 py-2 ring-1 ring-warn-100">💳 ' + t.cartao_nome + (t.qtd_parcelas > 1 ? (' · parcela ' + t.parcela_atual + ' de ' + t.qtd_parcelas) : ' · à vista') + '</div>'
+            : '') +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  async function deleteTx(id, row) {
+    if (!window.confirm('Confirma a exclusão deste lançamento? Essa ação não pode ser desfeita.')) return;
+    try {
+      await MCF.api('/api/transactions/' + encodeURIComponent(id), { method: 'DELETE' });
+      MCF.toast('Lançamento excluído com sucesso.', 'success');
+      load();
+    } catch (e) {
+      MCF.toast(e.message || 'Erro ao excluir.', 'error');
+    }
+  }
+
+  function bindDelete() {
+    document.querySelectorAll('[data-del]').forEach(function (btn) {
+      if (btn.__bound) return;
+      btn.__bound = true;
+      btn.addEventListener('click', function () {
+        deleteTx(btn.getAttribute('data-del'));
+      });
     });
+  }
+
+  function localRerender() {
+    var filtered = applyLocalFilters(loaded || []);
+    renderSummary(filtered);
+    renderRows(filtered);
+    bindDelete();
   }
 
   async function load() {
     var f = getFormFilters();
     MCF.setQuery(f);
+    var pEl = document.getElementById('periodLabel');
+    if (pEl) pEl.textContent = periodText(f.start_date, f.end_date);
     try {
       var url = MCF.buildTransactionsQuery(f);
-      var rows = await MCF.api(url);
-      formatSummary(rows);
-      renderRows(rows);
+      loaded = await MCF.api(url);
+      // se query string tem search, preenche
+      var q = MCF.qs('search', MCF.qs('q', ''));
+      var b = document.getElementById('busca');
+      if (b && q) { b.value = q; localSearch = q; }
+      else if (b) { localSearch = b.value; }
+      localRerender();
     } catch (e) {
       MCF.toast(e.message || 'Erro ao carregar lançamentos.', 'error');
     }
   }
 
-  document.addEventListener('DOMContentLoaded', async function () {
-    var f = MCF.currentFilters();
-    fillMonthYear(f);
-    applyFiltersToForm(f);
-    document.getElementById('f_start').value = f.start_date;
-    document.getElementById('f_end').value = f.end_date;
+  async function loadCategories() {
     try {
+      var f = MCF.currentFilters();
+      if (!f.month) f.month = MCF.qs('mes', '');
+      if (!f.year)  f.year  = MCF.qs('ano', '');
       var cats = await MCF.api('/api/categories');
       fillCategoryOptions(cats, f);
-    } catch (e) { MCF.toast('Erro ao carregar categorias.', 'error'); }
+    } catch (e) {
+      MCF.toast('Erro ao carregar categorias.', 'error');
+    }
+  }
+
+  function setupQuickChips() {
+    var ct = document.getElementById('chipsTipo');
+    if (ct) {
+      ct.querySelectorAll('.chip[data-type]').forEach(function (c) {
+        c.addEventListener('click', function () {
+          ct.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('is-active'); });
+          c.classList.add('is-active');
+          quickType = c.getAttribute('data-type') || '';
+          // sync select f_type
+          var s = document.getElementById('f_type');
+          if (s) s.value = quickType;
+          localRerender();
+        });
+      });
+    }
+    var cp = document.getElementById('chipsPag');
+    if (cp) {
+      cp.querySelectorAll('.chip[data-pg]').forEach(function (c) {
+        c.addEventListener('click', function () {
+          cp.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('is-active'); });
+          c.classList.add('is-active');
+          quickPag = c.getAttribute('data-pg') || '';
+          var s = document.getElementById('f_pag');
+          if (s) s.value = quickPag;
+          localRerender();
+        });
+      });
+    }
+    var b = document.getElementById('busca');
+    if (b) {
+      var t;
+      b.addEventListener('input', function () {
+        clearTimeout(t);
+        t = setTimeout(function () {
+          localSearch = b.value || '';
+          MCF.setQuery({ search: localSearch, q: '' });
+          localRerender();
+        }, 180);
+      });
+      window.addEventListener('mcf:search-change', function (e) {
+        b.value = (e.detail && e.detail.q) || '';
+        localSearch = b.value;
+        localRerender();
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    var f = MCF.currentFilters();
+    if (!f.month) f.month = MCF.qs('mes', '');
+    if (!f.year)  f.year  = MCF.qs('ano', '');
+    fillMonthYear(f);
+    applyFiltersToForm(f);
+    var st = document.getElementById('f_start'), en = document.getElementById('f_end');
+    if (st && !st.value && f.start_date) st.value = f.start_date;
+    if (en && !en.value && f.end_date)   en.value = f.end_date;
+    // compat: mes/ano e datas sincronizas
+    var mesQ = MCF.qs('mes', ''), anoQ = MCF.qs('ano', '');
+    if (mesQ && anoQ && !st.value && !en.value) {
+      var m = parseInt(mesQ, 10) - 1, y = parseInt(anoQ, 10);
+      var lastD = new Date(y, m + 1, 0).getDate();
+      st.value = (y + '-' + String(m + 1).padStart(2, '0') + '-01');
+      en.value = (y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastD).padStart(2, '0'));
+    }
+    var pEl = document.getElementById('periodLabel');
+    if (pEl) pEl.textContent = periodText(st ? st.value : '', en ? en.value : '');
+
+    await loadCategories();
+    setupQuickChips();
 
     document.getElementById('filterForm').addEventListener('submit', function (e) {
       e.preventDefault();
+      quickType = document.getElementById('f_type').value || '';
+      quickPag  = document.getElementById('f_pag').value  || '';
+      // sincroniza chips
+      var ct = document.getElementById('chipsTipo'); if (ct) {
+        ct.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-type') || '') === quickType); });
+      }
+      var cp = document.getElementById('chipsPag'); if (cp) {
+        cp.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('is-active', (x.getAttribute('data-pg') || '') === quickPag); });
+      }
       load();
     });
     document.getElementById('btnReset').addEventListener('click', function () {
-      MCF.setQuery({});
+      MCF.setQuery({ month: '', year: '', mes: '', ano: '', start_date: '', end_date: '', type: '', category: '', payment_method: '', search: '', q: '' });
       setTimeout(function () { location.reload(); }, 0);
     });
-    var mes = document.getElementById('f_mes');
-    var ano = document.getElementById('f_ano');
-    function sync() {
-      var f2 = getFormFilters();
-      document.getElementById('f_start').value = f2.start_date;
-      document.getElementById('f_end').value = f2.end_date;
-    }
-    mes.addEventListener('change', sync);
-    ano.addEventListener('change', sync);
 
-    attachDelete();
+    var fm = document.getElementById('f_mes'), fa = document.getElementById('f_ano');
+    function sync() {
+      if (!fm || !fa) return;
+      if (!fm.value || !fa.value) return;
+      var mv = fm.value, av = fa.value;
+      var m2 = parseInt(mv, 10) - 1, y2 = parseInt(av, 10);
+      var last2 = new Date(y2, m2 + 1, 0).getDate();
+      if (st) st.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-01');
+      if (en) en.value = (y2 + '-' + String(m2 + 1).padStart(2, '0') + '-' + String(last2).padStart(2, '0'));
+      if (pEl) pEl.textContent = periodText(st ? st.value : '', en ? en.value : '');
+    }
+    fm && fm.addEventListener('change', sync);
+    fa && fa.addEventListener('change', sync);
+
     load();
   });
 })();

@@ -1,59 +1,96 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="max-w-4xl">
-  <header class="mb-6">
-    <h2 class="text-2xl font-bold text-slate-900">Novo Lançamento</h2>
-    <p class="text-sm text-slate-500 mt-0.5">
-      Registre uma receita ou despesa e mantenha seu controle em dia.
-    </p>
+  <header class="flex flex-wrap items-end justify-between gap-4 mb-6">
+    <div>
+      <div class="flex items-center gap-2 mb-1.5">
+        <span class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-brand-50 to-sky-50 text-brand-700 ring-1 ring-brand-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide">
+          <span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>
+          Cadastro rápido
+        </span>
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">Novo Lançamento</h2>
+      <p class="text-sm text-slate-500 mt-1">Registre uma receita ou despesa — o formulário já vem com atalhos.</p>
+    </div>
+    <a href="/lancamentos" class="btn-ghost">← Voltar aos lançamentos</a>
   </header>
 
-  <div class="card p-4 sm:p-6 lg:p-8">
-    <form id="txForm" method="dialog" novalidate>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div class="sm:col-span-2">
-          <label class="label">Tipo</label>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
-              <input type="radio" name="tipo" value="RECEITA" required class="h-4 w-4" />
-              <div>
-                <p class="text-sm font-semibold text-emerald-700">Receita</p>
-                <p class="text-xs text-slate-500">Dinheiro que entrou</p>
-              </div>
-            </label>
-            <label class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer has-[:checked]:border-rose-400 has-[:checked]:bg-rose-50">
-              <input type="radio" name="tipo" value="DESPESA" class="h-4 w-4" />
-              <div>
-                <p class="text-sm font-semibold text-rose-700">Despesa</p>
-                <p class="text-xs text-slate-500">Dinheiro que saiu</p>
-              </div>
-            </label>
+  <div class="card-soft rounded-[2rem] p-5 sm:p-7 lg:p-8 relative overflow-hidden">
+    <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-brand-100/60 to-sky-100/40 blur-3xl pointer-events-none"></div>
+    <form id="txForm" method="dialog" novalidate class="relative">
+      <!-- Tipo: tabs -->
+      <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <p class="label mb-2">O que foi esse lançamento?</p>
+          <div id="tipoSwitch" class="type-switch w-full sm:w-[440px]">
+            <button type="button" data-type="RECEITA" class="is-active"><span class="inline-flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>Receita</span></button>
+            <button type="button" data-type="DESPESA" class=""><span class="inline-flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M19 12l-7-7-7 7"/></svg>Despesa</span></button>
+          </div>
+        </div>
+        <div id="quickPicks" class="flex gap-2 flex-wrap">
+          <button type="button" data-quick="salario" class="chip chip-income">+ Salário</button>
+          <button type="button" data-quick="freela" class="chip chip-income">+ Freelance</button>
+          <button type="button" data-quick="mercado" class="chip chip-outcome">− Mercado</button>
+          <button type="button" data-quick="alimentacao" class="chip chip-outcome">− Refeição</button>
+          <button type="button" data-quick="transporte" class="chip chip-outcome">− Transporte</button>
+        </div>
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-6">
+        <!-- Descrição -->
+        <div class="sm:col-span-6">
+          <label class="label" for="descricao">Descrição</label>
+          <input id="descricao" name="descricao" type="text" required class="field-soft" maxlength="255" placeholder="Ex: Salário de setembro, Supermercado, Uber casa → trabalho..." />
+        </div>
+
+        <!-- Valor -->
+        <div class="sm:col-span-3">
+          <label class="label">Valor</label>
+          <div class="input-money field-soft p-0">
+            <span class="prefix">R$</span>
+            <input id="valor" name="valor" required class="bg-transparent ring-0 border-0 w-full field-soft !rounded-2xl !pr-4" inputmode="decimal" placeholder="0,00" />
+          </div>
+          <div id="quickValues" class="mt-2 flex flex-wrap gap-1.5">
+            <button type="button" data-val="50" class="chip">R$ 50</button>
+            <button type="button" data-val="100" class="chip">R$ 100</button>
+            <button type="button" data-val="200" class="chip">R$ 200</button>
+            <button type="button" data-val="500" class="chip">R$ 500</button>
+            <button type="button" data-val="1000" class="chip">R$ 1.000</button>
+            <button type="button" data-val="5000" class="chip">R$ 5.000</button>
           </div>
         </div>
 
-        <div class="sm:col-span-2">
-          <label class="label" for="descricao">Descrição</label>
-          <input id="descricao" name="descricao" type="text" required class="field" maxlength="255" placeholder="Ex: Supermercado, Salário, Uber..." />
-        </div>
-
-        <div>
-          <label class="label" for="categoria">Categoria</label>
-          <select id="categoria" name="category_id" required class="field"><option value="">Selecione...</option></select>
-        </div>
-
-        <div>
-          <label class="label" for="valor">Valor</label>
-          <input id="valor" name="valor" required class="field text-lg font-semibold" inputmode="decimal" placeholder="R$ 0,00" />
-        </div>
-
-        <div>
+        <!-- Data -->
+        <div class="sm:col-span-3">
           <label class="label" for="data">Data da movimentação</label>
-          <input id="data" name="data" type="date" required class="field" />
+          <div class="flex gap-2">
+            <input id="data" name="data" type="date" required class="field-soft flex-1" />
+            <button type="button" id="btnHoje" class="btn-ghost !px-4 whitespace-nowrap">Hoje</button>
+          </div>
         </div>
 
-        <div>
-          <label class="label" for="forma_pagamento">Forma de pagamento</label>
-          <select id="forma_pagamento" name="forma_pagamento" required class="field">
+        <!-- Categoria -->
+        <div class="sm:col-span-6">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="label !mb-0">Categoria</label>
+            <select id="categoria" name="category_id" required class="hidden sm:block field-soft !py-1 !text-xs max-w-[260px]" aria-label="Categoria (detalhado)"><option value="">Selecione...</option></select>
+          </div>
+          <div id="categoryChips" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Forma de pagamento -->
+        <div class="sm:col-span-6">
+          <label class="label">Forma de pagamento</label>
+          <div id="formaChips" class="flex flex-wrap gap-2 mb-2">
+            <button type="button" class="chip" data-pg="PIX">PIX</button>
+            <button type="button" class="chip" data-pg="Dinheiro">Dinheiro</button>
+            <button type="button" class="chip" data-pg="Débito">Débito</button>
+            <button type="button" class="chip" data-pg="Cartão de crédito">Cartão de crédito</button>
+            <button type="button" class="chip" data-pg="Transferência">Transferência</button>
+            <button type="button" class="chip" data-pg="Boleto">Boleto</button>
+            <button type="button" class="chip" data-pg="Outro">Outro</button>
+          </div>
+          <select id="forma_pagamento" name="forma_pagamento" required class="field-soft max-w-sm" aria-label="Forma de pagamento (detalhado)">
             <option value="">Selecione...</option>
             <option>PIX</option>
             <option>Dinheiro</option>
@@ -65,31 +102,57 @@
           </select>
         </div>
 
-        <div id="creditFields" class="hidden sm:col-span-2 grid gap-4 sm:grid-cols-3 border border-brand-100 rounded-2xl bg-brand-50/40 p-4">
+        <!-- Cartão de crédito -->
+        <div id="creditFields" class="hidden sm:col-span-6 grid gap-4 sm:grid-cols-3 rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 ring-1 ring-warn-100 p-4 sm:p-5">
           <div>
             <label class="label" for="cartao_nome">Nome do cartão</label>
-            <input id="cartao_nome" name="cartao_nome" type="text" class="field" placeholder="Ex: Nubank, Inter..." />
+            <div class="flex gap-2">
+              <select id="cartao_nome_select" class="field-soft flex-1">
+                <option value="">Selecione...</option>
+                <option>Nubank Ultravioleta</option>
+                <option>Nubank</option>
+                <option>Inter Black</option>
+                <option>Inter</option>
+                <option>Itaú Mastercard</option>
+                <option>Bradesco Visa</option>
+                <option>Santander SX</option>
+                <option>C6 Bank Carbon</option>
+                <option>Meu Cartão</option>
+              </select>
+            </div>
+            <input id="cartao_nome" name="cartao_nome" type="text" class="field-soft mt-2" placeholder="Ou digite um nome novo..." />
           </div>
           <div>
             <label class="label" for="qtd_parcelas">Quantidade de parcelas</label>
-            <input id="qtd_parcelas" name="qtd_parcelas" type="number" min="1" class="field" placeholder="1" />
+            <input id="qtd_parcelas" name="qtd_parcelas" type="number" min="1" class="field-soft" placeholder="1" />
+            <div id="qtdChips" class="mt-2 flex flex-wrap gap-1.5">
+              <button type="button" data-qtd="1" class="chip">À vista</button>
+              <button type="button" data-qtd="2" class="chip">2x</button>
+              <button type="button" data-qtd="3" class="chip">3x</button>
+              <button type="button" data-qtd="6" class="chip">6x</button>
+              <button type="button" data-qtd="12" class="chip">12x</button>
+            </div>
           </div>
           <div>
             <label class="label" for="parcela_atual">Parcela atual</label>
-            <input id="parcela_atual" name="parcela_atual" type="number" min="1" class="field" placeholder="1" />
+            <input id="parcela_atual" name="parcela_atual" type="number" min="1" class="field-soft" placeholder="1" />
+            <div id="parcelaHelper" class="mt-2 text-xs font-semibold text-warn-600 rounded-2xl bg-white/70 ring-1 ring-warn-100 px-3 py-2">Deixe 1 para pagamento à vista.</div>
           </div>
         </div>
 
-        <div class="sm:col-span-2">
+        <!-- Observação -->
+        <div class="sm:col-span-6">
           <label class="label" for="observacao">Observação (opcional)</label>
-          <textarea id="observacao" name="observacao" rows="3" class="field" placeholder="Detalhes adicionais..."></textarea>
+          <textarea id="observacao" name="observacao" rows="3" class="field-soft" placeholder="Detalhes adicionais, número de documento, fornecedor, local..."></textarea>
         </div>
 
-        <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div id="formStatus" class="text-sm"></div>
+        <!-- Ações -->
+        <div class="sm:col-span-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3">
+          <div id="formStatus" class="text-sm text-slate-500"></div>
           <div class="flex gap-2">
-            <a href="/lancamentos" class="btn btn-ghost">Cancelar</a>
-            <button id="btnSave" type="submit" class="btn btn-primary">
+            <a href="/lancamentos" class="btn-ghost flex-1 sm:flex-none">Cancelar</a>
+            <button id="btnSave" type="submit" class="btn-primary flex-1 sm:flex-none !px-8">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               Salvar Lançamento
             </button>
           </div>

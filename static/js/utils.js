@@ -44,21 +44,25 @@
     return dateToISO(d.getDate(), d.getMonth() + 1, d.getFullYear());
   }
 
-  function monthStartISO(offsetMonthsBack(offset) {
+  function monthStartISO(offsetMonthsBack) {
     const d = new Date();
-    if (offset) d.setMonth(d.getMonth() + offset);
+    if (offsetMonthsBack) d.setMonth(d.getMonth() + offsetMonthsBack);
     return dateToISO(1, d.getMonth() + 1, d.getFullYear());
   }
   function monthEndISO(offsetMonthsBack) {
     const d = new Date();
     if (offsetMonthsBack) d.setMonth(d.getMonth() + offsetMonthsBack);
     const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    return dateToISO(last.getDate(), last.getMonth() + 1, last.getFullYear());
+    return dateToISO(last.getDate(), last.getMonth() + 1, d.getFullYear());
   }
 
   const MONTHS = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  ];
+  const WEEKDAYS = [
+    'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+    'Quinta-feira', 'Sexta-feira', 'Sábado',
   ];
 
   // ----------- query string helpers -----------
@@ -85,7 +89,7 @@
     if (!stack) return;
     const el = document.createElement('div');
     el.className = `toast toast-${type || 'info'}`;
-    el.style.minWidth = '220px';
+    el.style.minWidth = '240px';
     el.textContent = message;
     stack.appendChild(el);
     setTimeout(() => {
@@ -104,7 +108,7 @@
     const text = await res.text();
     try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
     if (!res.ok) {
-      const msg = (data && (data.detail || data.message)) || (`Erro ${res.status}`;
+      const msg = (data && (data.detail || data.message)) || (`Erro ${res.status}`);
       throw Object.assign(new Error(msg), { status: res.status, data });
     }
     return data;
@@ -156,7 +160,7 @@
   }
 
   // ----------- money input mask -----------
-  function maskMoney(input) {
+  function maskMoney(input, initialDecimal) {
     if (!input) return;
     const handler = () => {
       const digits = input.value.replace(/\D/g, '');
@@ -168,7 +172,12 @@
       input.setAttribute('data-value', n.toFixed(2));
     };
     input.addEventListener('input', handler);
-    if (input.value) handler();
+    if (initialDecimal !== undefined && initialDecimal !== null && initialDecimal !== '') {
+      input.value = String(Number(initialDecimal).toFixed(2));
+      handler();
+    } else if (input.value) {
+      handler();
+    }
   }
 
   function moneyToDecimal(input) {
@@ -185,7 +194,7 @@
     if (!note) return;
     const txt = window.__ENV_NOTE__ || '';
     if (!txt) return;
-    note.textContent = 'Atenção' + txt + ' — Os dados serão salvos em memória e perdidos ao reiniciar.';
+    note.innerHTML = '<strong>Atenção</strong>' + txt + ' — Os dados serão salvos em memória e perdidos ao reiniciar. <strong class="font-bold">Use os atalhos para testar rapidamente.</strong>';
     note.classList.remove('hidden');
   }
 
@@ -198,14 +207,90 @@
     if (!toggle || !back || !panel) return;
     const open = () => { back.classList.remove('hidden'); panel.classList.remove('hidden'); document.body.style.overflow = 'hidden'; };
     const shut = () => { back.classList.add('hidden'); panel.classList.add('hidden'); document.body.style.overflow = ''; };
+    window.MCF._drawerOpen = () => back && !back.classList.contains('hidden');
+    window.MCF._drawerClose = shut;
     toggle.addEventListener('click', open);
     if (closeBtn) closeBtn.addEventListener('click', shut);
     back.addEventListener('click', shut);
   }
 
+  // ----------- top bar data -----------
+  function setupTopBar() {
+    const label = document.getElementById('todayTopBarLabel');
+    const title = document.getElementById('todayTopBarTitle');
+    if (label) {
+      const d = new Date();
+      label.textContent = `${WEEKDAYS[d.getDay()]}, ${d.getDate()} de ${MONTHS[d.getMonth()].toLowerCase()} de ${d.getFullYear()}`;
+    }
+    if (title) {
+      const d = new Date();
+      title.textContent = `Controle de ${MONTHS[d.getMonth()].toLowerCase()}`;
+    }
+    const search = document.getElementById('globalSearch');
+    if (search) {
+      const cur = qs('search', '');
+      if (cur) search.value = cur;
+      let t;
+      search.addEventListener('input', () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          const path = (location.pathname === '/lancamentos') ? '' : '/lancamentos';
+          const p = new URLSearchParams(window.location.search);
+          const v = search.value.trim();
+          if (v) p.set('search', v); else p.delete('search');
+          const q = p.toString();
+          const target = (location.pathname || '/') === '/lancamentos'
+            ? ('/lancamentos' + (q ? `?${q}` : ''))
+            : ('/lancamentos' + (q ? `?${q}` : ''));
+          // Apenas atualiza query se já em /lancamentos, senão navega
+          if ((location.pathname || '/') === '/lancamentos') {
+            window.history.replaceState({}, '', target);
+            window.dispatchEvent(new CustomEvent('mcf:search-change', { detail: { q: v } }));
+          } else {
+            // só navega após Enter ou 600ms
+          }
+        }, 350);
+      });
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (location.pathname || '/') !== '/lancamentos') {
+          const p = new URLSearchParams();
+          const v = search.value.trim();
+          if (v) p.set('search', v);
+          window.location.assign('/lancamentos' + (p.toString() ? `?${p.toString()}` : ''));
+        }
+      });
+    }
+  }
+
+  // ----------- atalhos de teclado -----------
+  function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+      const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.isContentEditable);
+      const k = (e.key || '').toLowerCase();
+      if (k === 'escape') {
+        if (window.MCF._drawerOpen && window.MCF._drawerOpen()) {
+          window.MCF._drawerClose && window.MCF._drawerClose();
+          return;
+        }
+      }
+      if (typing) return;
+      if (k === 'n') { e.preventDefault(); window.location.assign('/novo'); return; }
+      if (k === 'r') { e.preventDefault(); window.location.assign('/novo?tipo=RECEITA'); return; }
+      if (k === 'e') { e.preventDefault(); window.location.assign('/novo?tipo=DESPESA'); return; }
+      if (k === 'd') { e.preventDefault(); window.location.assign('/'); return; }
+      if (k === 'l') { e.preventDefault(); window.location.assign('/lancamentos'); return; }
+      if (k === '1') { e.preventDefault(); window.location.assign('/'); return; }
+      if (k === '2') { e.preventDefault(); window.location.assign('/lancamentos'); return; }
+      if (k === '3') { e.preventDefault(); window.location.assign('/novo'); return; }
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     applyEnvNote();
     setupDrawer();
+    setupTopBar();
+    setupKeyboardShortcuts();
   });
 
   // Expõe globals
@@ -216,6 +301,7 @@
     monthStartISO,
     monthEndISO,
     MONTHS,
+    WEEKDAYS,
     qs,
     setQuery,
     toast,

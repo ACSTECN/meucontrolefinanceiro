@@ -350,6 +350,27 @@ class SupabaseTransactionRepository:
         import httpx
         self._session = httpx.Client(timeout=15.0)
 
+    @staticmethod
+    def _jsonable(v: Any) -> Any:
+        """Converte tipos Python não-JSON para tipos primitivos.
+        Resolve: datetime.date, datetime.datetime, Decimal, UUID,
+        listas e dicts aninhados."""
+        import datetime as _dt
+        from decimal import Decimal
+        if isinstance(v, UUID):
+            return str(v)
+        if isinstance(v, Decimal):
+            return float(v)
+        if isinstance(v, _dt.datetime):
+            return v.isoformat()
+        if isinstance(v, _dt.date):
+            return v.isoformat()
+        if isinstance(v, dict):
+            return {str(k): SupabaseTransactionRepository._jsonable(x) for k, x in v.items()}
+        if isinstance(v, (list, tuple, set)):
+            return [SupabaseTransactionRepository._jsonable(x) for x in v]
+        return v
+
     def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
         r = self._session.get(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
         if r.status_code >= 400:
@@ -357,19 +378,36 @@ class SupabaseTransactionRepository:
         return r.json()
 
     def _post(self, path: str, json_body: Any, extra_headers: Optional[Dict[str, str]] = None) -> Any:
+        import json as _json
         h = dict(self._headers)
         if extra_headers:
             h.update(extra_headers)
-        r = self._session.post(f"{self._rest_url}{path}", headers=h, json=json_body)
+        payload = self._jsonable(json_body)
+        content = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        r = self._session.post(f"{self._rest_url}{path}", headers=h, content=content)
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase POST {path} {r.status_code}: {r.text[:200]}")
-        return r.json()
+        try:
+            return r.json()
+        except Exception:
+            return r.text
 
     def _patch(self, path: str, json_body: Any, params: Optional[Dict[str, Any]] = None) -> Any:
-        r = self._session.patch(f"{self._rest_url}{path}", headers=self._headers, params=params or {}, json=json_body)
+        import json as _json
+        payload = self._jsonable(json_body)
+        content = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        r = self._session.patch(
+            f"{self._rest_url}{path}",
+            headers=self._headers,
+            params=params or {},
+            content=content,
+        )
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase PATCH {path} {r.status_code}: {r.text[:200]}")
-        return r.json()
+        try:
+            return r.json()
+        except Exception:
+            return r.text
 
     def _delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> int:
         r = self._session.delete(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
@@ -469,33 +507,23 @@ class SupabaseTransactionRepository:
         return self._attach_cat(d)
 
     def create_transaction(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        from decimal import Decimal
-        insertable = {}
-        for k, v in payload.items():
-            if v is None:
-                continue
-            if isinstance(v, UUID):
-                insertable[k] = str(v)
-            elif isinstance(v, Decimal):
-                insertable[k] = float(v)
-            else:
-                insertable[k] = v
+        # Remove None; o resto (date, Decimal, UUID, datetime) é convertido
+        # automaticamente por _jsonable() dentro de _post().
+        insertable = {k: v for k, v in payload.items() if v is not None}
         rows = self._post(
             "/transactions",
             json_body=[insertable],
             extra_headers={
-                "Prefer": "return=representation,resolution=merge-duplicates",
-                "Accept": "application/vnd.pgrst.object+json",
+                "Prefer": "return=representation",
+                "Accept": "application/json",
             },
         )
-        # Retorno pode ser lista ou objeto único dependendo do header
         if isinstance(rows, list):
             if not rows:
                 raise RuntimeError("Supabase insert não retornou a linha criada")
             row = dict(rows[0])
         else:
             row = dict(rows or {})
-        # Após inserir, buscamos de novo com join de categoria (pra garantia)
         if "id" in row:
             full = self.get_transaction(UUID(str(row["id"])))
             if full:
@@ -505,17 +533,7 @@ class SupabaseTransactionRepository:
     def update_transaction(
         self, tx_id: UUID, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
-        from decimal import Decimal
-        updatable = {}
-        for k, v in payload.items():
-            if v is None:
-                continue
-            if isinstance(v, UUID):
-                updatable[k] = str(v)
-            elif isinstance(v, Decimal):
-                updatable[k] = float(v)
-            else:
-                updatable[k] = v
+        updatable = {k: v for k, v in payload.items() if v is not None}
         self._patch(
             "/transactions",
             json_body=updatable,

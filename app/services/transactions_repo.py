@@ -472,7 +472,6 @@ class SupabaseTransactionRepository:
         )
         status = getattr(r, "status_code", None)
         if status == 406 or (status is None and not (getattr(r, "data", None) is None)):
-            # Tentamos buscar para confirmar se ainda existe (status 200 sem rows deletadas → KeyError)
             existing = self.get_transaction(tx_id)
             if existing is not None:
                 raise KeyError(f"Transaction {tx_id} not found")

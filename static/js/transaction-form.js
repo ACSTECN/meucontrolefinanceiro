@@ -100,6 +100,76 @@
     if (!cred) return;
     if (pg === 'Cartão de crédito') cred.classList.remove('hidden');
     else cred.classList.add('hidden');
+    atualizaParcelaHelper();
+  }
+
+  function isoToDate(s) {
+    if (!s) return null;
+    var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3]);
+  }
+  function addMonths(d, months) {
+    if (!d) return null;
+    var y = d.getFullYear();
+    var mo = d.getMonth() + (months || 0);
+    var targetYear = y + Math.floor(mo / 12);
+    var targetMonth = ((mo % 12) + 12) % 12;
+    // último dia do mês alvo
+    var last = new Date(targetYear, targetMonth + 1, 0).getDate();
+    var day = Math.min(d.getDate(), last);
+    return new Date(targetYear, targetMonth, day);
+  }
+  function fmtBRDate(d) {
+    if (!d) return '—';
+    var dd = String(d.getDate()).padStart(2, '0');
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    return dd + '/' + mm + '/' + d.getFullYear();
+  }
+
+  function atualizaParcelaHelper() {
+    var helper = document.getElementById('parcelaHelper');
+    if (!helper) return;
+    var pg = document.getElementById('forma_pagamento') ? document.getElementById('forma_pagamento').value : '';
+    var qtd = Number((document.getElementById('qtd_parcelas') || {}).value || 1) || 1;
+    var parcAtual = Number((document.getElementById('parcela_atual') || {}).value || 1) || 1;
+    if (parcAtual < 1) parcAtual = 1;
+    var valorStr = (document.getElementById('valor') || {}).value || '';
+    var valor = Number(MCF.moneyToDecimal(document.getElementById('valor')));
+    var data = isoToDate((document.getElementById('data') || {}).value);
+
+    if (pg !== 'Cartão de crédito' && !(qtd > 1)) {
+      helper.innerHTML = 'Deixe 1 para pagamento à vista.';
+      return;
+    }
+    if (qtd <= 1) {
+      helper.innerHTML = 'Pagamento à vista — nenhuma parcela futura.';
+      return;
+    }
+    var data1 = data;
+    var dataUlt = addMonths(data1, (qtd - parcAtual));
+    var total = valor * qtd;
+    helper.innerHTML =
+      '<div>📅 1ª parcela: <b>' + fmtBRDate(data1) + '</b> · Última: <b>' + fmtBRDate(dataUlt) + '</b></div>' +
+      '<div class="mt-1">💳 Total <b>' + qtd + 'x</b> de <b>' + MCF.formatBRL(valor) + '</b> = <b>' + MCF.formatBRL(total) + '</b></div>' +
+      (parcAtual > 1
+        ? '<div class="mt-1 text-amber-200/80">✦ Você escolheu começar na parcela ' + parcAtual + ' — as ' + (parcAtual - 1) + ' anteriores não serão lançadas.</div>'
+        : '');
+  }
+
+  function bindParcelaWatchers() {
+    ['qtd_parcelas', 'parcela_atual', 'data'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', atualizaParcelaHelper);
+      el.addEventListener('change', atualizaParcelaHelper);
+    });
+    var v = document.getElementById('valor');
+    if (v) {
+      v.addEventListener('keyup', function () { clearTimeout(window.__phTimer); window.__phTimer = setTimeout(atualizaParcelaHelper, 120); });
+      v.addEventListener('blur', atualizaParcelaHelper);
+      v.addEventListener('change', atualizaParcelaHelper);
+    }
   }
 
   function setQuickValue(val) {
@@ -250,6 +320,9 @@
     }
     // Máscara dinheiro
     MCF.maskMoney(document.getElementById('valor'));
+    // Watchers de parcela (calcula datas/valor total em tempo real)
+    bindParcelaWatchers();
+    atualizaParcelaHelper();
   }
 
   function applyQSPresetsNew() {
@@ -320,6 +393,16 @@
       window.__txForm.syncDescricao = true;
     } else {
       applyQSPresetsNew();
+    }
+    // Atualiza helper de parcelas com valores já pré-definidos (initial ou QS)
+    atualizaParcelaHelper();
+    // Sincroniza chips de qtd parcela ativos
+    var qtdChips = document.getElementById('qtdChips');
+    if (qtdChips) {
+      var qtdAtual = Number((document.getElementById('qtd_parcelas') || {}).value || 1) || 1;
+      qtdChips.querySelectorAll('[data-qtd]').forEach(function (c) {
+        c.classList.toggle('is-active', Number(c.getAttribute('data-qtd')) === qtdAtual);
+      });
     }
     // Render chips categoria no tipo default
     renderCategoryChips(currentTipo());

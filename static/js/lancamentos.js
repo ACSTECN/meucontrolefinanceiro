@@ -296,9 +296,13 @@
       var b = document.getElementById('busca');
       if (b && q) { b.value = q; localSearch = q; }
       else if (b) { localSearch = b.value; }
-      localRerender();
     } catch (e) {
+      // Em caso de erro, seta loaded = [] e renderiza mesmo assim, para não
+      // ficar com skeleton "Carregando..." infinito na tela.
+      loaded = [];
       MCF.toast(e.message || 'Erro ao carregar lançamentos.', 'error');
+    } finally {
+      localRerender();
     }
   }
 

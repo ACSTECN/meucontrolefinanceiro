@@ -12,7 +12,11 @@ from app.schemas.transaction import (
     TransactionResponse,
     TransactionUpdate,
 )
-from app.services.finance import _to_transaction_response, validate_transaction_payload
+from app.services.finance import (
+    _to_transaction_response,
+    validate_transaction_payload,
+    generate_installment_payloads,
+)
 from app.services.transactions_repo import get_default_repository
 
 
@@ -93,13 +97,44 @@ def create_transaction(payload: dict, repo: RepoDep):
         ) from None
 
     insertable = parsed.model_dump()
+    qtd = int(insertable.get("qtd_parcelas") or 1)
+    parcela_atual = int(insertable.get("parcela_atual") or 1)
+    if parcela_atual <= 0:
+        parcela_atual = 1
+        insertable["parcela_atual"] = parcela_atual
     try:
-        # Converte Decimal para string/float para evitar serialização
         if "valor" in insertable:
             from decimal import Decimal
             if isinstance(insertable["valor"], Decimal):
                 insertable["valor"] = float(insertable["valor"])
         created = repo.create_transaction(insertable)
+
+        # --- Parcelamento: cria parcelas futuras 2..N automaticamente ---
+        if qtd > 1:
+            installments = generate_installment_payloads(
+                base_payload=insertable,
+                qtd_parcelas=qtd,
+            )
+            for fut in installments:
+                # Validação rápida: garante o modelo p/ cada parcela
+                try:
+                    TransactionCreate.model_validate(fut)
+                except ValidationError as exc:
+                    errors = _unpack_validation_error(exc)
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "message": f"Falha na parcela {fut.get('parcela_atual')}: dados inválidos.",
+                            "errors": errors,
+                        },
+                    ) from None
+                if "valor" in fut:
+                    from decimal import Decimal
+                    if isinstance(fut["valor"], Decimal):
+                        fut["valor"] = float(fut["valor"])
+                # Insere parcela futura (erro aqui é propagado, não deixa transação parcial)
+                repo.create_transaction(fut)
+
     except AttributeError as exc:
         import traceback
         tb = traceback.format_exc()
@@ -107,6 +142,8 @@ def create_transaction(payload: dict, repo: RepoDep):
             status_code=500,
             detail={"message": f"Falha ao salvar lançamento: AttributeError - {str(exc)}", "trace": tb.splitlines()[-6:]},
         )
+    except HTTPException:
+        raise
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=500,

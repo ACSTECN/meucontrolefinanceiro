@@ -347,14 +347,14 @@ class SupabaseTransactionRepository:
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }
+        # Usa httpx stateless (sem sessão/Client persistente) — melhor p/ serverless,
+        # evita conexões presas e "carregando infinito" na Vercel Lambda.
         import httpx
-        self._session = httpx.Client(timeout=15.0)
+        self._httpx = httpx
+        self._timeout = 5.0
 
     @staticmethod
     def _jsonable(v: Any) -> Any:
-        """Converte tipos Python não-JSON para tipos primitivos.
-        Resolve: datetime.date, datetime.datetime, Decimal, UUID,
-        listas e dicts aninhados."""
         import datetime as _dt
         from decimal import Decimal
         if isinstance(v, UUID):
@@ -371,11 +371,24 @@ class SupabaseTransactionRepository:
             return [SupabaseTransactionRepository._jsonable(x) for x in v]
         return v
 
-    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
-        r = self._session.get(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
+    def _get(self, path: str, params: Any = None) -> Any:
+        try:
+            r = self._httpx.get(
+                f"{self._rest_url}{path}",
+                headers=self._headers,
+                params=params or {},
+                timeout=self._timeout,
+            )
+        except self._httpx.TimeoutException as exc:
+            raise RuntimeError(f"Supabase GET {path} timeout 5s excedido") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Supabase GET {path} falhou ({exc.__class__.__name__})") from exc
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase GET {path} {r.status_code}: {r.text[:200]}")
-        return r.json()
+        try:
+            return r.json()
+        except Exception:
+            return []
 
     def _post(self, path: str, json_body: Any, extra_headers: Optional[Dict[str, str]] = None) -> Any:
         import json as _json
@@ -384,7 +397,17 @@ class SupabaseTransactionRepository:
             h.update(extra_headers)
         payload = self._jsonable(json_body)
         content = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        r = self._session.post(f"{self._rest_url}{path}", headers=h, content=content)
+        try:
+            r = self._httpx.post(
+                f"{self._rest_url}{path}",
+                headers=h,
+                content=content,
+                timeout=self._timeout,
+            )
+        except self._httpx.TimeoutException as exc:
+            raise RuntimeError(f"Supabase POST {path} timeout 5s excedido") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Supabase POST {path} falhou ({exc.__class__.__name__})") from exc
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase POST {path} {r.status_code}: {r.text[:200]}")
         try:
@@ -392,28 +415,43 @@ class SupabaseTransactionRepository:
         except Exception:
             return r.text
 
-    def _patch(self, path: str, json_body: Any, params: Optional[Dict[str, Any]] = None) -> Any:
+    def _patch(self, path: str, json_body: Any, params: Any = None) -> Any:
         import json as _json
         payload = self._jsonable(json_body)
         content = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        r = self._session.patch(
-            f"{self._rest_url}{path}",
-            headers=self._headers,
-            params=params or {},
-            content=content,
-        )
+        try:
+            r = self._httpx.patch(
+                f"{self._rest_url}{path}",
+                headers=self._headers,
+                params=params or {},
+                content=content,
+                timeout=self._timeout,
+            )
+        except self._httpx.TimeoutException as exc:
+            raise RuntimeError(f"Supabase PATCH {path} timeout 5s excedido") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Supabase PATCH {path} falhou ({exc.__class__.__name__})") from exc
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase PATCH {path} {r.status_code}: {r.text[:200]}")
         try:
             return r.json()
         except Exception:
-            return r.text
+            return []
 
-    def _delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> int:
-        r = self._session.delete(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
+    def _delete(self, path: str, params: Any = None) -> int:
+        try:
+            r = self._httpx.delete(
+                f"{self._rest_url}{path}",
+                headers=self._headers,
+                params=params or {},
+                timeout=self._timeout,
+            )
+        except self._httpx.TimeoutException as exc:
+            raise RuntimeError(f"Supabase DELETE {path} timeout 5s excedido") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Supabase DELETE {path} falhou ({exc.__class__.__name__})") from exc
         if r.status_code >= 400:
             raise RuntimeError(f"Supabase DELETE {path} {r.status_code}: {r.text[:200]}")
-        # 204 No content ou 200 com rows
         return r.status_code
 
     @staticmethod
@@ -447,50 +485,39 @@ class SupabaseTransactionRepository:
         category_id: Optional[UUID] = None,
         payment_method: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        params: Dict[str, Any] = {
-            "select": "*,category:categories(nome)",
-            "order": "data.desc,created_at.desc",
-        }
+        # Usa sempre lista de tuplas para params (permite múltiplos valores
+        # para mesma chave, ex: data=gte.X&data=lte.Y em range de datas).
+        params_list: List[Tuple[str, str]] = [
+            ("select", "*,category:categories(nome)"),
+            ("order", "data.desc,created_at.desc"),
+        ]
         if type:
-            params["tipo"] = f"eq.{type}"
+            params_list.append(("tipo", f"eq.{type}"))
         if category_id:
-            params["category_id"] = f"eq.{category_id}"
+            params_list.append(("category_id", f"eq.{category_id}"))
         if payment_method:
-            params["forma_pagamento"] = f"eq.{payment_method}"
+            params_list.append(("forma_pagamento", f"eq.{payment_method}"))
         if start_date:
-            params["data"] = f"gte.{start_date}"
-            if end_date:
-                params["data"] = f"gte.{start_date}"
-                # Suporte a range em uma coluna: usar operador adjacente separado via header
-                # Em vez disso montamos and via dois operadores? Não — Supabase REST usa ?data=gte.X&data=lte.Y
-                # Portanto precisamos incluir duas vezes a mesma chave: httpx suporta lista no params
-        # Para range correto de data (sobrescreve acima)
-        if start_date and end_date:
-            params_list = [("select", params["select"]), ("order", params["order"])]
-            for k, v in params.items():
-                if k in ("select", "order"):
-                    continue
-                params_list.append((k, v))
             params_list.append(("data", f"gte.{start_date}"))
+        if end_date:
             params_list.append(("data", f"lte.{end_date}"))
-            # Remove 'data' do dict para não duplicar
-            params.pop("data", None)
-            params_tuple = params_list
-            rows = self._session.get(
+        try:
+            r = self._httpx.get(
                 f"{self._rest_url}/transactions",
                 headers=self._headers,
-                params=params_tuple,
-                timeout=15.0,
+                params=params_list,
+                timeout=self._timeout,
             )
-            if rows.status_code >= 400:
-                raise RuntimeError(f"Supabase GET /transactions {rows.status_code}: {rows.text[:200]}")
-            data = rows.json() or []
-            return [self._attach_cat(dict(x)) for x in data]
-        if start_date:
-            params["data"] = f"gte.{start_date}"
-        elif end_date:
-            params["data"] = f"lte.{end_date}"
-        data = self._get("/transactions", params=params) or []
+        except self._httpx.TimeoutException as exc:
+            raise RuntimeError("Supabase GET /transactions timeout 5s excedido") from exc
+        except Exception as exc:
+            raise RuntimeError(f"Supabase GET /transactions falhou ({exc.__class__.__name__})") from exc
+        if r.status_code >= 400:
+            raise RuntimeError(f"Supabase GET /transactions {r.status_code}: {r.text[:200]}")
+        try:
+            data = r.json() or []
+        except Exception:
+            data = []
         return [self._attach_cat(dict(x)) for x in data]
 
     def get_transaction(self, tx_id: UUID) -> Optional[Dict[str, Any]]:

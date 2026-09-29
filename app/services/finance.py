@@ -38,6 +38,63 @@ def _parse_iso_date(s: str) -> date:
     return date.fromisoformat(s)
 
 
+def add_months_to_date(d: date, months: int) -> date:
+    """Retorna `d` acrescido de `months` meses, mantendo consistência
+    (ex: 31/01 + 1m = 28/02 ou 29/02 em ano bissexto)."""
+    if months == 0:
+        return d
+    m = d.month - 1 + months
+    y = d.year + m // 12
+    m_adj = m % 12 + 1
+    # último dia do mês alvo
+    last_day = 31
+    while last_day > 1:
+        try:
+            return date(y, m_adj, last_day) if d.day > last_day else date(y, m_adj, d.day)
+        except ValueError:
+            last_day -= 1
+    return date(y, m_adj, 1)
+
+
+def generate_installment_payloads(
+    *,
+    base_payload: Dict[str, Any],
+    qtd_parcelas: int,
+) -> List[Dict[str, Any]]:
+    """Gera payloads das parcelas FUTURAS (2 a N) para um lançamento
+    parcelado. Não altera `base_payload`; retorna lista vazia quando
+    qtd_parcelas <= 1."""
+    if not qtd_parcelas or qtd_parcelas <= 1:
+        return []
+    import copy
+    try:
+        data_base = date.fromisoformat(str(base_payload.get("data")))
+    except Exception:
+        data_base = date.today()
+    parcela_1 = int(base_payload.get("parcela_atual") or 1)
+    if parcela_1 <= 0:
+        parcela_1 = 1
+    desc_base = str(base_payload.get("descricao") or "").strip()
+    out: List[Dict[str, Any]] = []
+    for i in range(2, qtd_parcelas + 1):
+        offset = i - parcela_1
+        data_parc = add_months_to_date(data_base, offset)
+        p = copy.deepcopy(base_payload)
+        p["data"] = data_parc
+        p["parcela_atual"] = i
+        p["qtd_parcelas"] = qtd_parcelas
+        if desc_base:
+            if desc_base.lower().find("parcela") != -1:
+                p["descricao"] = desc_base
+            else:
+                p["descricao"] = f"{desc_base} (Parcela {i}/{qtd_parcelas})"
+        # Remove chaves que possam ter vindo preenchidas de forma acidental
+        for k in ("id", "created_at", "updated_at"):
+            p.pop(k, None)
+        out.append(p)
+    return out
+
+
 @dataclass
 class ValidationErrorItem:
     field: str

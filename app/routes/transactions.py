@@ -78,9 +78,10 @@ def create_transaction(payload: dict, repo: RepoDep):
     try:
         parsed = TransactionCreate.model_validate(payload)
     except ValidationError as exc:
+        errors = _unpack_validation_error(exc)
         raise HTTPException(
             status_code=422,
-            detail="Dados inválidos para criar lançamento.",
+            detail={"message": "Dados inválidos para criar lançamento.", "errors": errors},
         ) from None
     # 2) Validação contra categorias do banco
     cats = repo.list_categories()
@@ -88,16 +89,29 @@ def create_transaction(payload: dict, repo: RepoDep):
     if biz:
         raise HTTPException(
             status_code=422,
-            detail="Erros de validação.",
+            detail={"message": "Erros de validação.", "errors": [{"field": e.field, "message": e.message} for e in biz]},
         ) from None
 
     insertable = parsed.model_dump()
     try:
+        # Converte Decimal para string/float para evitar serialização
+        if "valor" in insertable:
+            from decimal import Decimal
+            if isinstance(insertable["valor"], Decimal):
+                insertable["valor"] = float(insertable["valor"])
         created = repo.create_transaction(insertable)
+    except AttributeError as exc:
+        import traceback
+        tb = traceback.format_exc()
+        raise HTTPException(
+            status_code=500,
+            detail={"message": f"Falha ao salvar lançamento: AttributeError - {str(exc)}", "trace": tb.splitlines()[-6:]},
+        )
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=500,
-            detail=f"Falha ao salvar lançamento: {exc.__class__.__name__}",
+            detail={"message": f"Falha ao salvar lançamento: {exc.__class__.__name__} - {str(exc)}"},
+            headers={"X-Error-Class": exc.__class__.__name__},
         )
     return _map_response(created)
 

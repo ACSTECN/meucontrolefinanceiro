@@ -108,7 +108,15 @@
     const text = await res.text();
     try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
     if (!res.ok) {
-      const msg = (data && (data.detail || data.message)) || (`Erro ${res.status}`);
+      let msg = `Erro ${res.status}`;
+      if (data && typeof data === 'object') {
+        if (typeof data.detail === 'string') msg = data.detail;
+        else if (typeof data.detail === 'object' && data.detail.message) msg = data.detail.message;
+        else if (typeof data.message === 'string') msg = data.message;
+        else if (typeof data.error === 'string') msg = data.error;
+      } else if (typeof data === 'string') {
+        msg = data;
+      }
       throw Object.assign(new Error(msg), { status: res.status, data });
     }
     return data;

@@ -410,11 +410,17 @@ class SupabaseTransactionRepository:
         return d
 
     def create_transaction(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        insertable = {
-            k: (str(v) if isinstance(v, UUID) else v)
-            for k, v in payload.items()
-            if v is not None
-        }
+        from decimal import Decimal
+        insertable = {}
+        for k, v in payload.items():
+            if v is None:
+                continue
+            if isinstance(v, UUID):
+                insertable[k] = str(v)
+            elif isinstance(v, Decimal):
+                insertable[k] = float(v)
+            else:
+                insertable[k] = v
         r = (
             self._client.table("transactions")
             .insert(insertable)
@@ -422,7 +428,7 @@ class SupabaseTransactionRepository:
             .single()
             .execute()
         )
-        row = dict(r.data)
+        row = dict(r.data or {})
         if isinstance(row.get("category"), dict):
             row["categoria_nome"] = row["category"].get("nome")
         return row
@@ -430,11 +436,17 @@ class SupabaseTransactionRepository:
     def update_transaction(
         self, tx_id: UUID, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
-        updatable = {
-            k: (str(v) if isinstance(v, UUID) else v)
-            for k, v in payload.items()
-            if v is not None
-        }
+        from decimal import Decimal
+        updatable = {}
+        for k, v in payload.items():
+            if v is None:
+                continue
+            if isinstance(v, UUID):
+                updatable[k] = str(v)
+            elif isinstance(v, Decimal):
+                updatable[k] = float(v)
+            else:
+                updatable[k] = v
         r = (
             self._client.table("transactions")
             .update(updatable)

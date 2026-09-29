@@ -159,24 +159,21 @@
   }
   function badgePgto(pg) {
     if (!pg) return '<span class="badge badge-default">—</span>';
-    var palettes = {
-      'PIX': ['income', 'Recebido via PIX'],
-      'Cartão de crédito': ['warn',  'Cartão de crédito'],
-      'Débito': ['default', 'Débito'],
-      'Dinheiro': ['default', 'Dinheiro'],
-      'Transferência': ['default', 'Transferência'],
-      'Boleto': ['expense', 'Boleto'],
-      'Outro': ['default', 'Outro'],
-    };
-    var p = palettes[pg] || ['default', pg];
-    var cls = p[0] === 'income' ? 'badge-income' : p[0] === 'expense' ? 'badge-expense' : 'badge-default';
+    var cls = 'badge-default';
+    if (pg === 'PIX') cls = 'badge-pg-pix';
+    else if (pg === 'Cartão de crédito') cls = 'badge-pg-card';
+    else if (pg === 'Débito') cls = 'badge-pg-deb';
+    else if (pg === 'Dinheiro') cls = 'badge-pg-dinheiro';
+    else if (pg === 'Transferência') cls = 'badge-pg-transf';
+    else if (pg === 'Boleto') cls = 'badge-pg-boleto';
+    else if (pg === 'Outro') cls = 'badge-pg-outro';
     return '<span class="badge ' + cls + '">' + pg + '</span>';
   }
 
   function formatValor(t) {
     var sinal = t.tipo === 'RECEITA' ? '+' : '−';
-    var color = t.tipo === 'RECEITA' ? 'text-income-600' : 'text-outcome-600';
-    return '<div class="text-right whitespace-nowrap"><div class="text-sm font-extrabold ' + color + '">' + sinal + MCF.formatBRL(t.valor) + '</div></div>';
+    var color = t.tipo === 'RECEITA' ? 'color:#6ee7b7;text-shadow:0 0 18px rgba(16,185,129,.25)' : 'color:#fda4af;text-shadow:0 0 18px rgba(244,63,94,.25)';
+    return '<div class="text-right whitespace-nowrap"><div class="text-sm font-black" style="' + color + '">' + sinal + MCF.formatBRL(t.valor) + '</div></div>';
   }
 
   function renderRows(list) {
@@ -184,25 +181,26 @@
     var cards = document.getElementById('txCards');
     if (!list.length) {
       tbody.innerHTML =
-        '<tr><td colspan="7" class="px-5 py-16 text-center text-slate-500">' +
-          '<div class="mx-auto h-14 w-14 rounded-3xl bg-slate-100 text-slate-400 grid place-items-center mb-3">' +
+        '<tr><td colspan="7" class="px-5 py-16 text-center">' +
+          '<div class="mx-auto h-14 w-14 rounded-3xl grid place-items-center mb-3" style="background: linear-gradient(180deg, rgba(30,58,107,.5), rgba(5,12,26,.9)); border:1px solid rgba(59,130,246,.2); color:#93c5fd;">' +
             '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-list"/></svg>' +
           '</div>' +
-          '<p class="font-bold text-slate-700">Nenhum lançamento encontrado.</p>' +
-          '<p class="text-sm mt-1">Tente ajustar os filtros ou crie um lançamento clicando em "+ Novo Lançamento".</p>' +
+          '<p class="font-bold text-white/90">Nenhum lançamento encontrado.</p>' +
+          '<p class="text-sm mt-1.5 text-royal-300/70" style="color:#7a8eaf;">Tente ajustar os filtros ou crie um lançamento clicando em "+ Novo Lançamento".</p>' +
         '</td></tr>';
-      cards.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-white/60 p-6 text-center text-slate-500 text-sm">Nenhum lançamento no período.</div>';
+      cards.innerHTML =
+        '<div class="rounded-3xl p-6 text-center text-sm" style="background: linear-gradient(160deg, rgba(30,58,107,.45), rgba(5,12,26,.9)); border:1px dashed rgba(59,130,246,.35); color:#b5c6e0;">Nenhum lançamento no período.</div>';
       return;
     }
     tbody.innerHTML = list.map(function (t) {
       return (
-        '<tr class="' + (t.tipo === 'RECEITA' ? 'row-income' : 'row-expense') + ' align-middle">' +
+        '<tr class="' + (t.tipo === 'RECEITA' ? 'row-income' : 'row-expense') + '" style="border-bottom:1px solid rgba(59,130,246,0.08);">' +
           '<td class="px-5 py-3.5 whitespace-nowrap">' +
-            '<div class="font-extrabold text-slate-800">' + MCF.formatDateBR(t.data) + '</div>' +
+            '<div class="font-black text-[#e5eefc]">' + MCF.formatDateBR(t.data) + '</div>' +
           '</td>' +
           '<td class="px-5 py-3.5 min-w-[220px]">' +
-            '<div class="font-bold text-slate-900 truncate max-w-md">' + (t.descricao || '') + '</div>' +
-            (t.observacao ? '<div class="text-xs text-slate-500 truncate max-w-md">' + t.observacao + '</div>' : '') +
+            '<div class="font-bold text-white truncate max-w-md">' + (t.descricao || '') + '</div>' +
+            (t.observacao ? '<div class="text-xs truncate max-w-md" style="color:#7a8eaf;">' + t.observacao + '</div>' : '') +
           '</td>' +
           '<td class="px-5 py-3.5"><span class="badge badge-default">' + (t.categoria_nome || '') + '</span></td>' +
           '<td class="px-5 py-3.5">' + badgeTipo(t) + '</td>' +
@@ -225,20 +223,20 @@
     }).join('');
 
     cards.innerHTML = list.map(function (t) {
-      var valColor = t.tipo === 'RECEITA' ? 'income' : 'expense';
+      var valColor = t.tipo === 'RECEITA' ? 'color:#6ee7b7;text-shadow:0 0 18px rgba(16,185,129,.25)' : 'color:#fda4af;text-shadow:0 0 18px rgba(244,63,94,.25)';
       var sinal = t.tipo === 'RECEITA' ? '+' : '−';
       return (
         '<div class="tx-card !rounded-3xl">' +
           '<div class="flex items-start justify-between gap-3">' +
             '<div class="min-w-0 flex-1">' +
-              '<div class="flex flex-wrap items-center gap-2 mb-1">' +
+              '<div class="flex flex-wrap items-center gap-2 mb-1.5">' +
                 badgeTipo(t) + badgePgto(t.forma_pagamento) +
               '</div>' +
-              '<p class="font-extrabold text-slate-900 text-base truncate">' + (t.descricao || '') + '</p>' +
-              '<p class="text-xs text-slate-500 mt-0.5">' + MCF.formatDateBR(t.data) + ' · ' + (t.categoria_nome || '') + (t.observacao ? ' · ' + t.observacao : '') + '</p>' +
+              '<p class="font-black text-white text-base truncate">' + (t.descricao || '') + '</p>' +
+              '<p class="text-xs mt-0.5" style="color:#7a8eaf;">' + MCF.formatDateBR(t.data) + ' · ' + (t.categoria_nome || '') + (t.observacao ? ' · ' + t.observacao : '') + '</p>' +
             '</div>' +
             '<div class="text-right">' +
-              '<div class="font-extrabold ' + (t.tipo === 'RECEITA' ? 'text-income-600' : 'text-outcome-600') + ' text-lg">' + sinal + MCF.formatBRL(t.valor) + '</div>' +
+              '<div class="font-black text-lg" style="' + valColor + '">' + sinal + MCF.formatBRL(t.valor) + '</div>' +
               '<div class="flex gap-2 mt-3">' +
                 '<a href="/editar?id=' + encodeURIComponent(t.id) + '" class="btn-ghost !px-2.5 !py-1.5 text-xs">' +
                   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-edit"/></svg> Editar' +
@@ -250,7 +248,7 @@
             '</div>' +
           '</div>' +
           (t.forma_pagamento === 'Cartão de crédito' && t.cartao_nome
-            ? '<div class="mt-3 text-[11px] font-bold text-warn-600 rounded-2xl bg-warn-50 px-3 py-2 ring-1 ring-warn-100">💳 ' + t.cartao_nome + (t.qtd_parcelas > 1 ? (' · parcela ' + t.parcela_atual + ' de ' + t.qtd_parcelas) : ' · à vista') + '</div>'
+            ? '<div class="mt-3 text-[11px] font-bold px-3 py-2 rounded-2xl" style="color:#fde68a; background: linear-gradient(180deg, rgba(245,158,11,0.2), rgba(120,53,15,0.5)); border:1px solid rgba(245,158,11,.35);">💳 ' + t.cartao_nome + (t.qtd_parcelas > 1 ? (' · parcela ' + t.parcela_atual + ' de ' + t.qtd_parcelas) : ' · à vista') + '</div>'
             : '') +
         '</div>'
       );

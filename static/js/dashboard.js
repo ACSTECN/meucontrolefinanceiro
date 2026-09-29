@@ -144,6 +144,43 @@
     return out;
   }
 
+  var NAVY = {
+    bg:      '#0a1628',
+    cardBg:  'rgba(14, 29, 54, 0.75)',
+    text:    '#e5eefc',
+    soft:    '#b5c6e0',
+    mute:    '#7a8eaf',
+    grid:    'rgba(96, 165, 250, 0.12)',
+    ring:    'rgba(59, 130, 246, 0.3)',
+    doughnutBorder: '#0e1d36',
+    tooltipBg: 'linear-gradient(140deg, #172f57, #0a1628)',
+  };
+
+  function navyLegendLabels() {
+    return {
+      color: NAVY.soft,
+      boxWidth: 10,
+      padding: 12,
+      usePointStyle: false,
+      boxHeight: 10,
+      font: { family: 'Inter', size: 11, weight: '600' },
+    };
+  }
+  function navyTooltip() {
+    return {
+      backgroundColor: '#172f57',
+      borderColor: NAVY.ring,
+      borderWidth: 1,
+      titleColor: '#fff',
+      bodyColor: NAVY.soft,
+      padding: 12,
+      cornerRadius: 10,
+      titleFont: { family: 'Inter', weight: '800' },
+      bodyFont: { family: 'Inter', weight: '600' },
+      boxPadding: 4,
+    };
+  }
+
   function renderCharts(data) {
     var labels = (data.series || []).map(function (p) { return MCF.formatDateBR(p.label); });
     var incomes = (data.series || []).map(function (p) { return Number(p.income); });
@@ -159,17 +196,31 @@
         data: {
           labels: labels,
           datasets: [
-            { label: 'Receitas', data: incomes, backgroundColor: '#10b981', borderRadius: 10, maxBarThickness: 26 },
-            { label: 'Despesas', data: expenses, backgroundColor: '#ef4444', borderRadius: 10, maxBarThickness: 26 },
+            { label: 'Receitas', data: incomes, backgroundColor: 'rgba(16,185,129,0.92)', borderRadius: 10, borderSkipped: false, maxBarThickness: 24, hoverBackgroundColor: '#34d399' },
+            { label: 'Despesas', data: expenses, backgroundColor: 'rgba(244,63,94,0.92)', borderRadius: 10, borderSkipped: false, maxBarThickness: 24, hoverBackgroundColor: '#fb7185' },
           ],
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { family: 'Inter', weight: 'bold' } } },
-            tooltip: { backgroundColor: '#0f172a', titleFont: { family: 'Inter', weight: 'bold' }, bodyFont: { family: 'Inter' }, callbacks: { label: function (c) { return c.dataset.label + ': ' + MCF.formatBRL(c.parsed.y); } } } },
+          plugins: {
+            legend: { position: 'top', labels: Object.assign(navyLegendLabels(), { filter: function(item) { return !!item.text; } }) },
+            tooltip: Object.assign(navyTooltip(), { callbacks: { label: function (c) { return c.dataset.label + ': ' + MCF.formatBRL(c.parsed.y); } } }),
+          },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 } } },
-            y: { ticks: { font: { family: 'Inter', size: 10 }, callback: function (v) { return MCF.formatBRL(v); } }, grid: { color: 'rgba(148,163,184,0.12)' } },
+            x: {
+              grid: { display: false },
+              ticks: { color: NAVY.mute, font: { family: 'Inter', size: 10, weight: '600' } },
+              border: { color: 'rgba(59,130,246,0.15)' },
+            },
+            y: {
+              ticks: {
+                color: NAVY.mute,
+                font: { family: 'Inter', size: 10, weight: '600' },
+                callback: function (v) { return MCF.formatBRL(v); },
+              },
+              grid: { color: NAVY.grid, drawBorder: false },
+              border: { display: false },
+            },
           },
         },
       });
@@ -180,48 +231,92 @@
       if (!ctx) return null;
       var labels2 = arr.map(function (a) { return a.name; });
       var values = arr.map(function (a) { return Number(a.total); });
-      if (!values.length) {
+      var empty = !values.length;
+      if (empty) {
         labels2 = [emptyLabel || 'Sem dados'];
         values = [0.01];
       }
-      var palette = accent || ensureColors(labels2.length);
+      var palette = empty
+        ? ['rgba(59, 130, 246, 0.18)']
+        : (accent || ensureColors(labels2.length));
       return new Chart(ctx.getContext('2d'), {
         type: 'doughnut',
         data: {
           labels: labels2,
-          datasets: [{ data: values, backgroundColor: palette, borderWidth: 3, borderColor: '#ffffff', hoverOffset: 6 }],
+          datasets: [{
+            data: values,
+            backgroundColor: palette,
+            borderWidth: 3,
+            borderColor: NAVY.doughnutBorder,
+            hoverOffset: 8,
+            hoverBorderColor: '#60a5fa',
+            hoverBorderWidth: 2,
+          }],
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { family: 'Inter', size: 11, weight: '600' } } },
-            tooltip: { backgroundColor: '#0f172a', callbacks: { label: function (c) { return c.label + ': ' + MCF.formatBRL(c.parsed); } } } },
+          plugins: {
+            legend: { position: 'bottom', labels: navyLegendLabels() },
+            tooltip: Object.assign(navyTooltip(), { callbacks: { label: function (c) { return c.label + ': ' + MCF.formatBRL(c.parsed); } } }),
+          },
           cutout: '68%',
+          animation: { animateScale: true, animateRotate: true },
         },
       });
     }
 
     destroy('incCat'); destroy('expCat'); destroy('pag');
     charts.incCat = doughnut('chartIncCat', data.income_by_category || [], 'Sem receitas',
-      ['#10b981','#34d399','#059669','#047857','#6ee7b7','#065f46']);
+      ['#10b981','#34d399','#059669','#047857','#6ee7b7','#065f46','#14b8a6']);
     charts.expCat = doughnut('chartExpCat', data.expenses_by_category || [], 'Sem despesas',
-      ['#ef4444','#f97316','#dc2626','#b91c1c','#fb923c','#f87171']);
+      ['#f43f5e','#f97316','#fb7185','#be123c','#fbbf24','#f87171','#ea580c']);
 
     var ctxP = document.getElementById('chartPag');
     if (ctxP) {
       var labelsP = (data.expenses_by_payment_method || []).map(function (a) { return a.name; });
       var valuesP = (data.expenses_by_payment_method || []).map(function (a) { return Number(a.total); });
-      if (!valuesP.length) { labelsP = ['Sem dados']; valuesP = [0.01]; }
+      var emptyP = !valuesP.length;
+      if (emptyP) { labelsP = ['Sem dados']; valuesP = [0.01]; }
+      var paletteP = emptyP
+        ? ['rgba(59, 130, 246, 0.22)']
+        : ['#3b82f6','#6366f1','#0ea5e9','#f59e0b','#10b981','#8b5cf6','#94a3b8'];
       charts.pag = new Chart(ctxP.getContext('2d'), {
         type: 'bar',
         data: {
           labels: labelsP,
-          datasets: [{ label: 'Despesas', data: valuesP, backgroundColor: ['#4f46e5','#6366f1','#8b5cf6','#f59e0b','#0ea5e9','#14b8a6','#94a3b8'], borderRadius: 10, maxBarThickness: 26 }],
+          datasets: [{
+            label: 'Despesas',
+            data: valuesP,
+            backgroundColor: paletteP,
+            borderRadius: 10,
+            borderSkipped: false,
+            maxBarThickness: 22,
+            hoverBackgroundColor: '#60a5fa',
+          }],
         },
         options: {
           responsive: true, maintainAspectRatio: false,
           indexAxis: 'y',
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', callbacks: { label: function (c) { return MCF.formatBRL(c.parsed.x); } } } },
-          scales: { x: { ticks: { callback: function (v) { return MCF.formatBRL(v); }, font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.12)' } }, y: { grid: { display: false }, ticks: { font: { weight: '600', size: 11 } } } },
+          plugins: {
+            legend: { display: false },
+            tooltip: Object.assign(navyTooltip(), { callbacks: { label: function (c) { return MCF.formatBRL(c.parsed.x); } } }),
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: NAVY.mute,
+                font: { family: 'Inter', size: 10, weight: '600' },
+                callback: function (v) { return MCF.formatBRL(v); },
+              },
+              grid: { color: NAVY.grid, drawBorder: false },
+              border: { display: false },
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: NAVY.soft, font: { family: 'Inter', weight: '700', size: 11 } },
+              border: { color: 'rgba(59,130,246,0.15)' },
+            },
+          },
         },
       });
     }

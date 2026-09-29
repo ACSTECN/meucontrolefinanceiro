@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import os
 from pathlib import Path
 
@@ -19,6 +20,7 @@ router = APIRouter(tags=["pages"])
 def _render(request: Request, template_name: str, **extra):
     ctx = {
         "title_extra": extra.pop("title_extra", ""),
+        "today": datetime.date.today(),
         "env_note": " (Modo local - Supabase ausente)"
         if not (os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
         else "",

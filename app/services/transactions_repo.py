@@ -332,38 +332,72 @@ class InMemoryTransactionRepository:
 
 
 class SupabaseTransactionRepository:
-    """Implementação do repositório usando supabase-py (service_role)."""
+    """Implementação do repositório usando HTTP REST direto no Supabase
+    (httpx). NÃO DEPENDE da biblioteca supabase-py para queries, evitando
+    AttributeErrors de API inconsistente entre v1/v2 (ex:
+    'SyncQueryRequestBuilder has no attribute select')."""
 
-    def __init__(self, client) -> None:
-        self._client = client
+    def __init__(self, cfg: Any) -> None:
+        # cfg é o dataclass SupabaseRestConfig
+        self._rest_url = cfg.rest_url.rstrip("/")
+        self._service_key = cfg.service_role_key
+        self._headers = {
+            "apikey": self._service_key,
+            "Authorization": f"Bearer {self._service_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+        import httpx
+        self._session = httpx.Client(timeout=15.0)
 
-    def _tbl(self, name: str):
-        """Wrapper unificado: usa .from_() em supabase v2+, .table() em v1.
-        Evita AttributeError: 'SyncQueryRequestBuilder' object has no attribute 'select'"""
-        if hasattr(self._client, "from_") and callable(self._client.from_):
-            return self._client.from_(name)
-        return self._client.table(name)
+    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        r = self._session.get(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
+        if r.status_code >= 400:
+            raise RuntimeError(f"Supabase GET {path} {r.status_code}: {r.text[:200]}")
+        return r.json()
+
+    def _post(self, path: str, json_body: Any, extra_headers: Optional[Dict[str, str]] = None) -> Any:
+        h = dict(self._headers)
+        if extra_headers:
+            h.update(extra_headers)
+        r = self._session.post(f"{self._rest_url}{path}", headers=h, json=json_body)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Supabase POST {path} {r.status_code}: {r.text[:200]}")
+        return r.json()
+
+    def _patch(self, path: str, json_body: Any, params: Optional[Dict[str, Any]] = None) -> Any:
+        r = self._session.patch(f"{self._rest_url}{path}", headers=self._headers, params=params or {}, json=json_body)
+        if r.status_code >= 400:
+            raise RuntimeError(f"Supabase PATCH {path} {r.status_code}: {r.text[:200]}")
+        return r.json()
+
+    def _delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> int:
+        r = self._session.delete(f"{self._rest_url}{path}", headers=self._headers, params=params or {})
+        if r.status_code >= 400:
+            raise RuntimeError(f"Supabase DELETE {path} {r.status_code}: {r.text[:200]}")
+        # 204 No content ou 200 com rows
+        return r.status_code
+
+    @staticmethod
+    def _attach_cat(row: Dict[str, Any]) -> Dict[str, Any]:
+        if isinstance(row.get("category"), dict):
+            row["categoria_nome"] = row["category"].get("nome")
+        return row
 
     # ---- Categories ----
     def list_categories(self) -> List[Dict[str, Any]]:
-        r = (
-            self._tbl("categories")
-            .select("*")
-            .order("tipo", desc=False)
-            .order("nome", desc=False)
-            .execute()
+        rows = self._get(
+            "/categories",
+            params={"select": "*", "order": "tipo.asc,nome.asc"},
         )
-        return list(r.data or [])
+        return [dict(r) for r in (rows or [])]
 
     def get_category(self, cat_id: UUID) -> Optional[Dict[str, Any]]:
-        r = (
-            self._tbl("categories")
-            .select("*")
-            .eq("id", str(cat_id))
-            .maybe_single()
-            .execute()
+        rows = self._get(
+            "/categories",
+            params={"select": "*", "id": f"eq.{cat_id}"},
         )
-        return r.data or None
+        return dict(rows[0]) if rows else None
 
     # ---- Transactions ----
     def list_transactions(
@@ -375,46 +409,64 @@ class SupabaseTransactionRepository:
         category_id: Optional[UUID] = None,
         payment_method: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        q = (
-            self._tbl("transactions")
-            .select("*, category:categories(nome)")
-            .order("data", desc=True)
-            .order("created_at", desc=True)
-        )
+        params: Dict[str, Any] = {
+            "select": "*,category:categories(nome)",
+            "order": "data.desc,created_at.desc",
+        }
         if type:
-            q = q.eq("tipo", type)
+            params["tipo"] = f"eq.{type}"
         if category_id:
-            q = q.eq("category_id", str(category_id))
+            params["category_id"] = f"eq.{category_id}"
         if payment_method:
-            q = q.eq("forma_pagamento", payment_method)
+            params["forma_pagamento"] = f"eq.{payment_method}"
         if start_date:
-            q = q.gte("data", start_date)
-        if end_date:
-            q = q.lte("data", end_date)
-        data = q.execute().data or []
-        flat: List[Dict[str, Any]] = []
-        for r in data:
-            d = dict(r)
-            if isinstance(d.get("category"), dict):
-                d["categoria_nome"] = d["category"].get("nome")
-            flat.append(d)
-        return flat
+            params["data"] = f"gte.{start_date}"
+            if end_date:
+                params["data"] = f"gte.{start_date}"
+                # Suporte a range em uma coluna: usar operador adjacente separado via header
+                # Em vez disso montamos and via dois operadores? Não — Supabase REST usa ?data=gte.X&data=lte.Y
+                # Portanto precisamos incluir duas vezes a mesma chave: httpx suporta lista no params
+        # Para range correto de data (sobrescreve acima)
+        if start_date and end_date:
+            params_list = [("select", params["select"]), ("order", params["order"])]
+            for k, v in params.items():
+                if k in ("select", "order"):
+                    continue
+                params_list.append((k, v))
+            params_list.append(("data", f"gte.{start_date}"))
+            params_list.append(("data", f"lte.{end_date}"))
+            # Remove 'data' do dict para não duplicar
+            params.pop("data", None)
+            params_tuple = params_list
+            rows = self._session.get(
+                f"{self._rest_url}/transactions",
+                headers=self._headers,
+                params=params_tuple,
+                timeout=15.0,
+            )
+            if rows.status_code >= 400:
+                raise RuntimeError(f"Supabase GET /transactions {rows.status_code}: {rows.text[:200]}")
+            data = rows.json() or []
+            return [self._attach_cat(dict(x)) for x in data]
+        if start_date:
+            params["data"] = f"gte.{start_date}"
+        elif end_date:
+            params["data"] = f"lte.{end_date}"
+        data = self._get("/transactions", params=params) or []
+        return [self._attach_cat(dict(x)) for x in data]
 
     def get_transaction(self, tx_id: UUID) -> Optional[Dict[str, Any]]:
-        r = (
-            self._tbl("transactions")
-            .select("*, category:categories(nome)")
-            .eq("id", str(tx_id))
-            .maybe_single()
-            .execute()
+        rows = self._get(
+            "/transactions",
+            params={
+                "select": "*,category:categories(nome)",
+                "id": f"eq.{tx_id}",
+            },
         )
-        row = r.data
-        if not row:
+        if not rows:
             return None
-        d = dict(row)
-        if isinstance(d.get("category"), dict):
-            d["categoria_nome"] = d["category"].get("nome")
-        return d
+        d = dict(rows[0])
+        return self._attach_cat(d)
 
     def create_transaction(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         from decimal import Decimal
@@ -428,17 +480,27 @@ class SupabaseTransactionRepository:
                 insertable[k] = float(v)
             else:
                 insertable[k] = v
-        r = (
-            self._tbl("transactions")
-            .insert(insertable)
-            .select("*, category:categories(nome)")
-            .single()
-            .execute()
+        rows = self._post(
+            "/transactions",
+            json_body=[insertable],
+            extra_headers={
+                "Prefer": "return=representation,resolution=merge-duplicates",
+                "Accept": "application/vnd.pgrst.object+json",
+            },
         )
-        row = dict(r.data or {})
-        if isinstance(row.get("category"), dict):
-            row["categoria_nome"] = row["category"].get("nome")
-        return row
+        # Retorno pode ser lista ou objeto único dependendo do header
+        if isinstance(rows, list):
+            if not rows:
+                raise RuntimeError("Supabase insert não retornou a linha criada")
+            row = dict(rows[0])
+        else:
+            row = dict(rows or {})
+        # Após inserir, buscamos de novo com join de categoria (pra garantia)
+        if "id" in row:
+            full = self.get_transaction(UUID(str(row["id"])))
+            if full:
+                return full
+        return self._attach_cat(row)
 
     def update_transaction(
         self, tx_id: UUID, payload: Dict[str, Any]
@@ -454,34 +516,21 @@ class SupabaseTransactionRepository:
                 updatable[k] = float(v)
             else:
                 updatable[k] = v
-        r = (
-            self._tbl("transactions")
-            .update(updatable)
-            .eq("id", str(tx_id))
-            .select("*, category:categories(nome)")
-            .maybe_single()
-            .execute()
+        self._patch(
+            "/transactions",
+            json_body=updatable,
+            params={"id": f"eq.{tx_id}"},
         )
-        row = r.data
-        if not row:
+        full = self.get_transaction(tx_id)
+        if not full:
             raise KeyError(f"Transaction {tx_id} not found")
-        d = dict(row)
-        if isinstance(d.get("category"), dict):
-            d["categoria_nome"] = d["category"].get("nome")
-        return d
+        return full
 
     def delete_transaction(self, tx_id: UUID) -> None:
-        r = (
-            self._tbl("transactions")
-            .delete()
-            .eq("id", str(tx_id))
-            .execute()
-        )
-        status = getattr(r, "status_code", None)
-        if status == 406 or (status is None and not (getattr(r, "data", None) is None)):
-            existing = self.get_transaction(tx_id)
-            if existing is not None:
-                raise KeyError(f"Transaction {tx_id} not found")
+        existing = self.get_transaction(tx_id)
+        if existing is None:
+            raise KeyError(f"Transaction {tx_id} not found")
+        self._delete("/transactions", params={"id": f"eq.{tx_id}"})
 
 
 # Instância global de fallback (in-memory) para quando Supabase não está
@@ -491,11 +540,16 @@ _fallback_repo: Optional[InMemoryTransactionRepository] = None
 
 def get_default_repository() -> TransactionRepository:
     global _fallback_repo
-    from app.database.supabase_client import get_supabase
+    from app.database.supabase_client import get_supabase_rest_config
 
-    sb = get_supabase()
-    if sb is not None:
-        return SupabaseTransactionRepository(sb)  # type: ignore[return-value]
+    cfg = get_supabase_rest_config()
+    if cfg is not None:
+        # Usa REST httpx direto — nunca mais dá erro de atributo da lib supabase
+        try:
+            return SupabaseTransactionRepository(cfg)  # type: ignore[return-value]
+        except Exception:
+            # Se a inicialização (httpx import) falhar por qualquer motivo, cai no in-memory
+            pass
     if _fallback_repo is None:
         _fallback_repo = InMemoryTransactionRepository(transactions=_demo_transactions())
     return _fallback_repo  # type: ignore[return-value]

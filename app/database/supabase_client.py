@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, TYPE_CHECKING
+import ssl
+from dataclasses import dataclass
+from typing import Optional
 
 try:
     from dotenv import load_dotenv
@@ -9,25 +11,38 @@ try:
 except Exception:  # pragma: no cover - dotenv opcional em produção
     pass
 
-if TYPE_CHECKING:
-    from supabase import Client as SupabaseClientType
 
-_SUPABASE_CLIENT: Optional["SupabaseClientType"] = None
+@dataclass
+class SupabaseRestConfig:
+    """Configuração estrita p/ API REST do Supabase (httpx direto).
+    Não depende da biblioteca supabase-py, evita AttributeErrors de API
+    inconsistente entre v1/v2 da lib."""
+
+    rest_url: str
+    service_role_key: str
 
 
-def get_supabase() -> Optional["SupabaseClientType"]:
-    global _SUPABASE_CLIENT
-    if _SUPABASE_CLIENT is not None:
-        return _SUPABASE_CLIENT
+_CONFIG: Optional[SupabaseRestConfig] = None
 
-    url = os.environ.get("SUPABASE_URL")
-    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+def get_supabase_rest_config() -> Optional[SupabaseRestConfig]:
+    """Retorna (url_rest + service_key) se variáveis estiverem setadas."""
+    global _CONFIG
+    if _CONFIG is not None:
+        return _CONFIG
+
+    url = os.environ.get("SUPABASE_URL") or ""
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
     if not url or not service_key:
         return None
 
-    try:
-        from supabase import create_client
-        _SUPABASE_CLIENT = create_client(url, service_key)
-    except Exception:
-        _SUPABASE_CLIENT = None
-    return _SUPABASE_CLIENT
+    # Garante URL base terminando com / para concatenar /rest/v1
+    base = url.rstrip("/")
+    rest_url = f"{base}/rest/v1"
+    _CONFIG = SupabaseRestConfig(rest_url=rest_url, service_role_key=service_key)
+    return _CONFIG
+
+
+# Mantém compatibilidade com código legado (retorna None, código usa REST agora)
+def get_supabase():
+    return None

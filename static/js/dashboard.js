@@ -345,14 +345,37 @@
     }).join('');
   }
 
+  // Timer DEFENSIVO p/ nunca ficar com skeleton preso.
+  var MAX_DASH_MS = 7000;
+  var dashLoadResolved = false;
+  var dashTimerId = null;
+  function _forceDashFinish(silentTimeout) {
+    if (dashLoadResolved) return;
+    dashLoadResolved = true;
+    if (dashTimerId) { clearTimeout(dashTimerId); dashTimerId = null; }
+    // Esconde skeleton se existir
+    var sk = document.querySelectorAll('.skeleton, [data-skeleton="true"]');
+    (sk || []).forEach(function (e) { e.style.display = 'none'; });
+    var empty = document.getElementById('emptyState');
+    if (empty) empty.classList.remove('hidden');
+    if (silentTimeout) MCF.toast('Tempo excedido: recarregue para tentar novamente.', 'warn');
+  }
+
   async function loadDashboard() {
+    dashLoadResolved = false;
+    if (dashTimerId) { clearTimeout(dashTimerId); dashTimerId = null; }
     var f = getFormFilters();
     MCF.setQuery(f);
     var pLabel = document.getElementById('periodLabel');
     if (pLabel) pLabel.textContent = periodText(f.start_date, f.end_date);
+    dashTimerId = setTimeout(function () { _forceDashFinish(true); }, MAX_DASH_MS);
     try {
       var url = MCF.buildDashboardQuery(f);
-      var data = await MCF.api(url);
+      var data = await MCF.withTimeout(
+        MCF.api(url),
+        MAX_DASH_MS,
+        'Tempo máximo de carregamento do dashboard excedido.',
+      );
       renderKPIs(data);
       renderCharts(data);
       renderUltimas(data.ultimas_movimentacoes);
@@ -363,6 +386,8 @@
       }
     } catch (e) {
       MCF.toast(e.message || 'Erro ao carregar dashboard.', 'error');
+    } finally {
+      _forceDashFinish(false);
     }
   }
 
@@ -373,10 +398,11 @@
       var f2 = Object.assign({}, f);
       if (!f2.month) f2.month = MCF.qs('mes', '');
       if (!f2.year)  f2.year  = MCF.qs('ano', '');
-      var cats = await MCF.api('/api/categories');
+      var cats = await MCF.withTimeout(MCF.api('/api/categories'), 6000);
       fillCategoryOptions(cats, f2);
     } catch (e) {
-      MCF.toast('Erro ao carregar categorias.', 'error');
+      MCF.toast('Erro ao carregar categorias (usando padrão).', 'warn');
+      fillCategoryOptions({}, MCF.currentFilters());
     }
   }
 

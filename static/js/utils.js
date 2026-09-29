@@ -100,26 +100,65 @@
     }, 3200);
   }
 
+  // ----------- Promise timeout helper -----------
+  function withTimeout(promise, ms, message) {
+    let cancelId = null;
+    const timeout = new Promise((_, reject) => {
+      cancelId = setTimeout(() => {
+        const err = new Error(message || `Timeout de ${ms}ms excedido.`);
+        err.name = 'TimeoutError';
+        reject(err);
+      }, ms);
+    });
+    const race = Promise.race([promise, timeout]).finally(() => {
+      if (cancelId) clearTimeout(cancelId);
+    });
+    return race;
+  }
+
   // ----------- API helpers -----------
+  const API_TIMEOUT_MS = 7000; // 7s hard limit para QUALQUER chamada de API (nunca mais pendurada)
+
   async function api(url, opts) {
     const options = Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {});
-    const res = await fetch(url, options);
-    let data = null;
-    const text = await res.text();
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
-    if (!res.ok) {
-      let msg = `Erro ${res.status}`;
-      if (data && typeof data === 'object') {
-        if (typeof data.detail === 'string') msg = data.detail;
-        else if (typeof data.detail === 'object' && data.detail.message) msg = data.detail.message;
-        else if (typeof data.message === 'string') msg = data.message;
-        else if (typeof data.error === 'string') msg = data.error;
-      } else if (typeof data === 'string') {
-        msg = data;
+    // AbortController nativo p/ matar a conexão real no timeout (não é só o Promise)
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const abortId = controller ? setTimeout(() => controller.abort(), API_TIMEOUT_MS) : null;
+    const fetchOpts = Object.assign({}, options);
+    if (controller) fetchOpts.signal = controller.signal;
+
+    try {
+      const res = await withTimeout(
+        fetch(url, fetchOpts),
+        API_TIMEOUT_MS,
+        `Tempo máximo de ${(API_TIMEOUT_MS / 1000).toFixed(0)}s excedido ao carregar ${url}`,
+      );
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+      if (!res.ok) {
+        let msg = `Erro ${res.status}`;
+        if (data && typeof data === 'object') {
+          if (typeof data.detail === 'string') msg = data.detail;
+          else if (typeof data.detail === 'object' && data.detail.message) msg = data.detail.message;
+          else if (typeof data.message === 'string') msg = data.message;
+          else if (typeof data.error === 'string') msg = data.error;
+        } else if (typeof data === 'string') {
+          msg = data;
+        }
+        throw Object.assign(new Error(msg), { status: res.status, data });
       }
-      throw Object.assign(new Error(msg), { status: res.status, data });
+      return data;
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        const e = new Error(`Tempo máximo excedido (${(API_TIMEOUT_MS / 1000).toFixed(0)}s) em ${url}. Tente recarregar a página.`);
+        e.name = 'TimeoutError';
+        throw e;
+      }
+      throw err;
+    } finally {
+      if (abortId) clearTimeout(abortId);
     }
-    return data;
   }
 
   // ----------- filters helpers -----------
@@ -313,6 +352,7 @@
     qs,
     setQuery,
     toast,
+    withTimeout,
     api,
     DEFAULT_FILTERS,
     currentFilters,

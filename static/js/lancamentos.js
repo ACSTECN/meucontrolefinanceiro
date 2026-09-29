@@ -283,14 +283,40 @@
     bindDelete();
   }
 
+  // Timer DEFENSIVO: nunca deixa "Carregando..." infinito.
+  // Mesmo que a Promise da API fique pendente para sempre (ex: Lambda travado / timeout nao propagado),
+  // esse setTimeout garante que localRerender() sera chamado em no MAXIMO 6 segundos apos iniciar o load().
+  var MAX_LOAD_MS = 6000;
+  var loadTimerId = null;
+  var loadResolved = false;
+  function _forceLoadFinish(silentTimeout) {
+    if (loadResolved) return;
+    loadResolved = true;
+    if (loadTimerId) { clearTimeout(loadTimerId); loadTimerId = null; }
+    if (silentTimeout && (!loaded || loaded.length === 0)) {
+      MCF.toast('Tempo excedido: mostrando lista local. Recarregue a página para tentar novamente.', 'warn');
+    }
+    try { localRerender(); } catch (e) { /* ignore render errors */ }
+  }
+
   async function load() {
+    loadResolved = false;
+    if (loadTimerId) { clearTimeout(loadTimerId); loadTimerId = null; }
+    loaded = null; // volta para "carregando" visualmente
     var f = getFormFilters();
     MCF.setQuery(f);
     var pEl = document.getElementById('periodLabel');
     if (pEl) pEl.textContent = periodText(f.start_date, f.end_date);
+    loadTimerId = setTimeout(function () { _forceLoadFinish(true); }, MAX_LOAD_MS);
     try {
       var url = MCF.buildTransactionsQuery(f);
-      loaded = await MCF.api(url);
+      var resultado = await MCF.withTimeout(
+        MCF.api(url),
+        MAX_LOAD_MS,
+        'Tempo máximo de carregamento excedido.',
+      );
+      if (!Array.isArray(resultado)) throw new Error('Resposta inválida da API de lançamentos.');
+      loaded = resultado;
       // se query string tem search, preenche
       var q = MCF.qs('search', MCF.qs('q', ''));
       var b = document.getElementById('busca');
@@ -300,9 +326,9 @@
       // Em caso de erro, seta loaded = [] e renderiza mesmo assim, para não
       // ficar com skeleton "Carregando..." infinito na tela.
       loaded = [];
-      MCF.toast(e.message || 'Erro ao carregar lançamentos.', 'error');
+      if (!loadResolved) MCF.toast(e.message || 'Erro ao carregar lançamentos.', 'error');
     } finally {
-      localRerender();
+      _forceLoadFinish(false);
     }
   }
 
@@ -311,10 +337,11 @@
       var f = MCF.currentFilters();
       if (!f.month) f.month = MCF.qs('mes', '');
       if (!f.year)  f.year  = MCF.qs('ano', '');
-      var cats = await MCF.api('/api/categories');
+      var cats = await MCF.withTimeout(MCF.api('/api/categories'), 6000);
       fillCategoryOptions(cats, f);
     } catch (e) {
-      MCF.toast('Erro ao carregar categorias.', 'error');
+      MCF.toast('Erro ao carregar categorias (usando padrão).', 'warn');
+      fillCategoryOptions([], MCF.currentFilters());
     }
   }
 

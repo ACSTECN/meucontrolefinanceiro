@@ -45,11 +45,12 @@ CREATE TABLE public.transactions (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- CHECK adicional: se forma_pagamento = Cartão de crédito, parcela_atual <= qtd_parcelas
+-- CHECK adicional: se forma_pagamento = Cartão de crédito / Empréstimo, parcela_atual <= qtd_parcelas
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS tx_parcela_check;
 ALTER TABLE public.transactions
 ADD CONSTRAINT tx_parcela_check
 CHECK (
-    forma_pagamento <> 'Cartão de crédito'
+    (forma_pagamento <> 'Cartão de crédito' AND forma_pagamento <> 'Empréstimo')
     OR qtd_parcelas IS NULL
     OR parcela_atual IS NULL
     OR parcela_atual <= qtd_parcelas
@@ -106,3 +107,9 @@ INSERT INTO public.categories (tipo, nome, slug) VALUES
     ('DESPESA', 'Educação',     'educacao'),
     ('DESPESA', 'Impostos',     'impostos'),
     ('DESPESA', 'Outros',       'outros');
+
+-- Categorias adicionais (execute mesmo se já tiver rodado o seed inicial):
+INSERT INTO public.categories (tipo, nome, slug) VALUES ('DESPESA', 'Empréstimo / Financiamento', 'emprestimo-financiamento')
+ON CONFLICT (tipo, slug) DO NOTHING;
+INSERT INTO public.categories (tipo, nome, slug) VALUES ('DESPESA', 'Juros / Taxas bancárias', 'juros-taxas')
+ON CONFLICT (tipo, slug) DO NOTHING;

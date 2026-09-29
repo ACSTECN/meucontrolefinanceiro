@@ -98,7 +98,8 @@
     });
     var cred = document.getElementById('creditFields');
     if (!cred) return;
-    if (pg === 'Cartão de crédito') cred.classList.remove('hidden');
+    var HABILITA_PARCELAS = ['Cartão de crédito', 'Empréstimo'];
+    if (HABILITA_PARCELAS.indexOf(pg) !== -1) cred.classList.remove('hidden');
     else cred.classList.add('hidden');
     atualizaParcelaHelper();
   }
@@ -138,7 +139,7 @@
     var valor = Number(MCF.moneyToDecimal(document.getElementById('valor')));
     var data = isoToDate((document.getElementById('data') || {}).value);
 
-    if (pg !== 'Cartão de crédito' && !(qtd > 1)) {
+    if (pg !== 'Cartão de crédito' && pg !== 'Empréstimo' && !(qtd > 1)) {
       helper.innerHTML = 'Deixe 1 para pagamento à vista.';
       return;
     }
@@ -224,15 +225,55 @@
   }
 
   async function loadCategories() {
-    var data = await MCF.api('/api/categories');
-    ['RECEITA', 'DESPESA'].forEach(function (t) {
-      CATEGORIES_BY_TYPE[t] = (data[t] || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); });
-      CATEGORIES_BY_NAME[t] = {};
-      CATEGORIES_BY_TYPE[t].forEach(function (c) {
-        CATEGORIES_BY_ID[c.id] = c;
-        CATEGORIES_BY_NAME[t][c.nome] = c;
+    try {
+      var data = await MCF.withTimeout(MCF.api('/api/categories'), 6000);
+      ['RECEITA', 'DESPESA'].forEach(function (t) {
+        CATEGORIES_BY_TYPE[t] = (data[t] || []).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); });
+        CATEGORIES_BY_NAME[t] = {};
+        CATEGORIES_BY_TYPE[t].forEach(function (c) {
+          CATEGORIES_BY_ID[c.id] = c;
+          CATEGORIES_BY_NAME[t][c.nome] = c;
+        });
       });
-    });
+    } catch (e) {
+      // Fallback hardcoded se a API de categorias falhar — usuario nao fica com combo vazio.
+      // IMPORTANTE: IDs MESMOS do _CATEGORIES_SEED em app/services/transactions_repo.py — assim,
+      // se cair no InMemoryRepository fallback singleton (quando Supabase nao configurado),
+      // tudo funciona perfeitamente sem FK errors.
+      var fallback = {
+        RECEITA: [
+          { id: '00000000-0000-0000-0000-000000000001', nome: 'Salário', slug: 'salario', tipo: 'RECEITA' },
+          { id: '00000000-0000-0000-0000-000000000002', nome: 'Freelance', slug: 'freelance', tipo: 'RECEITA' },
+          { id: '00000000-0000-0000-0000-000000000003', nome: 'Venda', slug: 'venda', tipo: 'RECEITA' },
+          { id: '00000000-0000-0000-0000-000000000004', nome: 'Reembolso', slug: 'reembolso', tipo: 'RECEITA' },
+          { id: '00000000-0000-0000-0000-000000000005', nome: 'Outras receitas', slug: 'outras-receitas', tipo: 'RECEITA' },
+        ],
+        DESPESA: [
+          { id: '00000000-0000-0000-0000-000000000011', nome: 'Alimentação', slug: 'alimentacao', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000012', nome: 'Mercado', slug: 'mercado', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000013', nome: 'Transporte', slug: 'transporte', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000014', nome: 'Moradia', slug: 'moradia', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000015', nome: 'Saúde', slug: 'saude', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000016', nome: 'Academia', slug: 'academia', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000017', nome: 'Lazer', slug: 'lazer', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000018', nome: 'Assinaturas', slug: 'assinaturas', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000019', nome: 'Compras', slug: 'compras', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000020', nome: 'Educação', slug: 'educacao', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000021', nome: 'Impostos', slug: 'impostos', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000023', nome: 'Empréstimo / Financiamento', slug: 'emprestimo-financiamento', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000024', nome: 'Juros / Taxas bancárias', slug: 'juros-taxas', tipo: 'DESPESA' },
+          { id: '00000000-0000-0000-0000-000000000022', nome: 'Outros', slug: 'outros', tipo: 'DESPESA' },
+        ],
+      };
+      ['RECEITA', 'DESPESA'].forEach(function (t) {
+        CATEGORIES_BY_TYPE[t] = fallback[t] || [];
+        CATEGORIES_BY_NAME[t] = {};
+        CATEGORIES_BY_TYPE[t].forEach(function (c) {
+          CATEGORIES_BY_ID[c.id] = c;
+          CATEGORIES_BY_NAME[t][c.nome] = c;
+        });
+      });
+    }
     var sel = document.getElementById('categoria');
     if (sel) {
       sel.innerHTML = '<option value="">Selecione...</option>';
@@ -248,7 +289,7 @@
         sel.appendChild(grp);
       });
     }
-    return data;
+    return { RECEITA: CATEGORIES_BY_TYPE.RECEITA, DESPESA: CATEGORIES_BY_TYPE.DESPESA };
   }
 
   function initStaticBehavior() {
@@ -433,10 +474,14 @@
         parcela_atual: Number(document.getElementById('parcela_atual').value || 1) || 1,
         observacao: String(document.getElementById('observacao').value || '').trim() || null,
       };
-      if (payload.forma_pagamento !== 'Cartão de crédito') {
+      var HABILITA_PARCELAS_FORMAS = ['Cartão de crédito', 'Empréstimo'];
+      if (HABILITA_PARCELAS_FORMAS.indexOf(payload.forma_pagamento) === -1) {
         payload.cartao_nome = null;
         payload.qtd_parcelas = 1;
         payload.parcela_atual = 1;
+      } else if (payload.forma_pagamento === 'Empréstimo') {
+        // Empréstimo não usa campo nome do cartão — mas mantem parcelas.
+        payload.cartao_nome = null;
       }
       // validar categoria pertence ao tipo
       if (payload.category_id && CATEGORIES_BY_ID[payload.category_id] && CATEGORIES_BY_ID[payload.category_id].tipo !== payload.tipo) {

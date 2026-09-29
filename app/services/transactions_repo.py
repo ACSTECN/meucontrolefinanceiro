@@ -109,6 +109,18 @@ _CATEGORIES_SEED: List[Dict[str, Any]] = [
         "nome": "Outros",
         "slug": "outros",
     },
+    {
+        "id": UUID("00000000-0000-0000-0000-000000000023"),
+        "tipo": "DESPESA",
+        "nome": "Empréstimo / Financiamento",
+        "slug": "emprestimo-financiamento",
+    },
+    {
+        "id": UUID("00000000-0000-0000-0000-000000000024"),
+        "tipo": "DESPESA",
+        "nome": "Juros / Taxas bancárias",
+        "slug": "juros-taxas",
+    },
 ]
 
 

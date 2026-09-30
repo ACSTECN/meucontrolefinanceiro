@@ -97,10 +97,17 @@
       else chip.classList.remove('is-active');
     });
     var cred = document.getElementById('creditFields');
-    if (!cred) return;
+    var card = document.getElementById('cardNameFields');
     var HABILITA_PARCELAS = ['Cartão de crédito', 'Empréstimo'];
-    if (HABILITA_PARCELAS.indexOf(pg) !== -1) cred.classList.remove('hidden');
-    else cred.classList.add('hidden');
+    var HABILITA_CARTAO = ['Cartão de crédito'];
+    if (cred) {
+      if (HABILITA_PARCELAS.indexOf(pg) !== -1) cred.classList.remove('hidden');
+      else cred.classList.add('hidden');
+    }
+    if (card) {
+      if (HABILITA_CARTAO.indexOf(pg) !== -1) card.classList.remove('hidden');
+      else card.classList.add('hidden');
+    }
     atualizaParcelaHelper();
   }
 
@@ -221,6 +228,11 @@
       var pa = Number(payload.parcela_atual || 1) || 0;
       if (q < 1) errs.push('Quantidade de parcelas deve ser pelo menos 1.');
       if (pa < 1 || pa > q) errs.push('Parcela atual inválida.');
+    }
+    if (payload.forma_pagamento === 'Cartão de crédito') {
+      if (!payload.cartao_nome || !String(payload.cartao_nome).trim()) {
+        errs.push('Informe o nome do cartão de crédito.');
+      }
     }
     return errs;
   }

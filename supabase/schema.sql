@@ -35,7 +35,7 @@ CREATE TABLE public.transactions (
     data                DATE NOT NULL,
     forma_pagamento     VARCHAR(30) NOT NULL CHECK (forma_pagamento IN (
                             'PIX', 'Dinheiro', 'Débito', 'Cartão de crédito',
-                            'Transferência', 'Boleto', 'Outro'
+                            'Empréstimo', 'Transferência', 'Boleto', 'Outro'
                         )),
     cartao_nome         VARCHAR(80),
     qtd_parcelas        INTEGER CHECK (qtd_parcelas IS NULL OR qtd_parcelas >= 1),

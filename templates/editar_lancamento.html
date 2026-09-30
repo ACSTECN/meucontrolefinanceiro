@@ -105,7 +105,7 @@
           </select>
         </div>
 
-        <div id="creditFields" class="hidden sm:col-span-6 grid gap-4 sm:grid-cols-3 p-4 sm:p-5 rounded-3xl"
+        <div id="cardNameFields" class="hidden sm:col-span-2 p-4 sm:p-5 rounded-3xl"
              style="background: radial-gradient(600px 240px at 0% -40%, rgba(245,158,11,0.25), transparent 60%), linear-gradient(160deg, rgba(120,53,15,0.45), rgba(5,12,26,0.8)); border:1px solid rgba(245,158,11,0.3); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
           <div>
             <label class="label" for="cartao_nome">Nome do cartão</label>
@@ -123,6 +123,10 @@
             </select>
             <input id="cartao_nome" name="cartao_nome" type="text" class="field-soft mt-2" placeholder="Ou digite um nome novo..." />
           </div>
+        </div>
+
+        <div id="creditFields" class="hidden sm:col-span-4 grid gap-4 sm:grid-cols-2 p-4 sm:p-5 rounded-3xl"
+             style="background: radial-gradient(600px 240px at 0% -40%, rgba(245,158,11,0.25), transparent 60%), linear-gradient(160deg, rgba(120,53,15,0.45), rgba(5,12,26,0.8)); border:1px solid rgba(245,158,11,0.3); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
           <div>
             <label class="label" for="qtd_parcelas">Quantidade de parcelas</label>
             <input id="qtd_parcelas" name="qtd_parcelas" type="number" min="1" class="field-soft" placeholder="1" />
